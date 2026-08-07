@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Nightly at 02:00 PST (UTC-8) to catch upstream schema drift. See the live
+    # job. GitHub cron is always UTC and does not observe DST, so this lands at
+    # 03:00 local during PDT.
+    - cron: "0 10 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: build
+        run: go build ./...
+
+      # Live tests are skipped unless OPENBETA_LIVE is set, so this run stays
+      # offline and deterministic. See the live job below.
+      - name: test
+        run: go test -race ./...
+
+  # The live API is a free public service run by volunteers. Hitting it on every
+  # push would be rude and would make CI fail for reasons unrelated to the code,
+  # so these run nightly and on demand — they exist to catch upstream schema
+  # drift, not to gate merges.
+  live:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: test against live API
+        env:
+          OPENBETA_LIVE: "1"
+        run: go test -v -run Live ./internal/openbeta
