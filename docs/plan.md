@@ -1,9 +1,13 @@
 # OpenBeta MCP Server — POC Design Plan
 
 Requirements extracted from this document live in
-[docs/functional-requirements.md](docs/functional-requirements.md) and
-[docs/non-functional-requirements.md](docs/non-functional-requirements.md). This file remains the
+[functional-requirements.md](functional-requirements.md) and
+[non-functional-requirements.md](non-functional-requirements.md). This file remains the
 design-rationale record — the "why" behind those requirements.
+
+Several of its findings were later corrected by introspection against the live API — the
+`totalClimbs` filter, the zoom behaviour, and the claim that no point/radius resolver exists. See
+[graphql-findings.md](graphql-findings.md) for the evidence.
 
 Context: [RFC #487](https://github.com/OpenBeta/openbeta-graphql/issues/487) proposes an official
 TypeScript/stdio MCP server for OpenBeta. This is a third-party Go POC, not an attempt to preempt

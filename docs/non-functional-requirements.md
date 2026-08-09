@@ -1,7 +1,7 @@
 # Non-Functional Requirements — OpenBeta MCP Server (POC)
 
 Qualities the server must have, as distinct from the behaviour specified in
-[functional-requirements.md](functional-requirements.md). Rationale lives in [plan.md](../plan.md).
+[functional-requirements.md](functional-requirements.md). Rationale lives in [plan.md](plan.md).
 
 Requirement IDs are stable once assigned.
 
@@ -117,6 +117,6 @@ one.
 **NFR-17** — Every functional requirement is verifiable, either against the live API or against a
 recorded fixture. A requirement that cannot be checked either way should be rewritten or dropped.
 
-**NFR-18** — Handler logic — argument validation, the `totalClimbs == 0` filter, wire-to-summary
+**NFR-18** — Handler logic — argument validation, the climb-count filter of FR-9, wire-to-summary
 mapping — is testable without network access, which follows from the transport and type separation
 in NFR-9 and NFR-10.

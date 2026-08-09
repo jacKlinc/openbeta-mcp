@@ -11,7 +11,7 @@ Reference bbox throughout: Squamish, `[-123.2, 49.6, -122.9, 49.8]`.
 ## 1. `totalClimbs` is not a climb count
 
 This is the most consequential finding, and it inverts the filter originally specified in
-[plan.md](../plan.md).
+[plan.md](plan.md).
 
 `Area.totalClimbs` reads `0` on the large majority of leaf crags that hold climbs:
 

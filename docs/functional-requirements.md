@@ -1,6 +1,6 @@
 # Functional Requirements — OpenBeta MCP Server (POC)
 
-What the server must do. Design rationale for these decisions lives in [plan.md](../plan.md); this
+What the server must do. Design rationale for these decisions lives in [plan.md](plan.md); this
 document carries only the "what", stated so each item can be verified.
 
 Requirement IDs are stable once assigned — if a requirement is dropped, mark it withdrawn rather
@@ -33,10 +33,14 @@ Returns climbing areas inside a geographic bounding box.
 
 **FR-5** — The tool accepts two arguments:
 
-| Argument | Type | Meaning |
-| --- | --- | --- |
-| `bbox` | array of 4 floats | `[minLng, minLat, maxLng, maxLat]` |
-| `zoom` | float | map zoom level, passed through to upstream |
+| Argument | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `bbox` | array of 4 floats | yes | `[minLng, minLat, maxLng, maxLat]` |
+| `zoom` | float | no — defaults to 13 | map zoom level, passed through to upstream |
+
+`zoom` defaults to 13 rather than being required. Leaving it out must not silently return parent
+regions: the default has to sit at or above the leaf threshold in FR-9a, and 13 clears it. A caller
+asking "what can I climb here" wants crags.
 
 **FR-6** — The `bbox` element order is `minLng, minLat, maxLng, maxLat` — longitude first. This
 ordering was confirmed empirically against the live API, not read off the schema (the schema types
@@ -88,7 +92,7 @@ this rather than treat zoom as a free parameter:
 The cutover is a property of the upstream resolver, not of the bbox. Zoom 11+ is the right default
 for a "what can I climb here" question.
 
-This also corrects the original observation in [plan.md](../plan.md), which was taken at low zoom:
+This also corrects the original observation in [plan.md](plan.md), which was taken at low zoom:
 the parent areas seen there are not mixed into leaf results, they are what low zoom returns
 *instead* of leaf results.
 
@@ -188,7 +192,7 @@ wrong:
 
 ## 5. Out of scope for this POC
 
-Explicitly excluded. Each is a deliberate decision, with rationale in [plan.md](../plan.md).
+Explicitly excluded. Each is a deliberate decision, with rationale in [plan.md](plan.md).
 
 | Excluded | Reason |
 | --- | --- |
@@ -198,7 +202,7 @@ Explicitly excluded. Each is a deliberate decision, with rationale in [plan.md](
 | `search_climbs` | Present in RFC #487, dropped here — judged to be the wrong tool shape. |
 | Point + radius proximity search | Out of scope for the two-tool POC — but see the correction below; the schema does support it. |
 
-**Correction to [plan.md](../plan.md):** plan.md states there is "no dedicated point/radius resolver
+**Correction to [plan.md](plan.md):** plan.md states there is "no dedicated point/radius resolver
 on the schema". Introspection shows otherwise — the root query field exists:
 
 ```graphql
