@@ -3,29 +3,56 @@
 A Go MCP server over the [OpenBeta](https://openbeta.io) climbing database, exposing rock climbing
 areas and routes to LLM clients. Read-only, single binary, stdio transport.
 
+> [!NOTE]
+> **AI Transparency Disclosure:** This project utilizes AI coding assistants to generate boilerplates, optimize benchmarks, and refine documentation. All critical logic and performance calculations are human-reviewed and verified.
+
+
 Third-party proof of concept — not affiliated with OpenBeta, and not a replacement for the official
 TypeScript server proposed in [RFC #487](https://github.com/OpenBeta/openbeta-graphql/issues/487).
 
 > Climbing information is user-contributed and can be wrong. Grades, protection and access notes
 > are opinions, not facts. Verify anything safety-critical against a current local guidebook.
 
-## Status
+## Install
 
-The GraphQL query layer is built and tested against the live API. The MCP server wiring — tool
-registration and stdio transport — is not written yet, so there is nothing to install.
+```bash
+go build -o openbeta-mcp ./cmd/openbeta-mcp
+```
 
-| Piece                                  | State       |
-| -------------------------------------- | ----------- |
-| `cragsWithin` query + filtering        | done        |
-| `area` query + mapping                 | done        |
-| MCP tool registration, stdio transport | not started |
+That produces a single binary with no runtime dependencies. There is no API key and nothing to
+configure — the OpenBeta API is public and read-only. `-endpoint` overrides the GraphQL URL and
+`-version` prints the build version; neither is needed for normal use.
 
-## Tools (planned)
+Point an MCP client at the binary using an **absolute path** — clients don't necessarily run with
+the working directory you'd expect.
 
-**`crags_within(bbox, zoom)`** — crags inside a bounding box.
+### Claude Code
 
-`bbox` is `[minLng, minLat, maxLng, maxLat]` — **longitude first**. `zoom` selects the level of the
-area hierarchy: 11 or above returns individual crags, below that returns parent regions.
+```bash
+claude mcp add openbeta -- "$(pwd)/openbeta-mcp"
+```
+
+Verify it connected:
+
+```bash
+claude mcp list             # connection status for every configured server
+claude mcp get openbeta     # config and failure detail for this one
+claude mcp remove openbeta  # undo
+```
+
+`/mcp` inside a session shows the same status plus the tool list.
+
+Then ask for something that needs it — *"what can I climb near Squamish?"* — and Claude Code should
+call `crags_within`.
+
+
+## Tools
+
+**`crags_within(bbox, zoom)`** — crags inside a bounding box, largest first.
+
+`bbox` is `[minLng, minLat, maxLng, maxLat]` — **longitude first**. `zoom` is optional and selects
+the level of the area hierarchy: 11 or above returns individual crags, below that returns parent
+regions. It defaults to 13.
 
 **`get_area_details(areaId)`** — name, coordinates, description, routes and sub-areas for one area.
 
@@ -52,10 +79,16 @@ by volunteers.
 ## Layout
 
 ```
+cmd/openbeta-mcp/     binary: flags, stdio transport, shutdown
+internal/mcpserver/   MCP tool definitions and handlers
 internal/openbeta/    GraphQL client, queries, wire and output types
 docs/                 requirements and verified API findings
-plan.md               design rationale
+docs/plan.md          design rationale
 ```
+
+The tool logic doesn't depend on the transport — [internal/mcpserver](internal/mcpserver/) returns a
+configured server and [cmd/openbeta-mcp](cmd/openbeta-mcp/) decides how to run it, so adding an HTTP
+transport later is a change at the composition root rather than a fork of the handlers.
 
 ## Documentation
 
