@@ -5,6 +5,12 @@ package openbeta
 // Field selections here were confirmed by introspection and live queries against
 // https://api.openbeta.io/graphql. See docs/graphql-findings.md for the evidence
 // behind the less obvious choices.
+//
+// The operations in queries/ are compiled to a typed client in generated/ by
+// genqlient. Regenerate after editing a query or refreshing the schema; the
+// result is committed and CI checks it is up to date.
+//
+//go:generate go run github.com/Khan/genqlient ../../genqlient.yaml
 
 // queryCragsWithin fetches areas inside a bounding box.
 //
