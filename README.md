@@ -4,7 +4,7 @@ A Go MCP server over the [OpenBeta](https://openbeta.io) climbing database, expo
 areas and routes to LLM clients. Read-only, single binary, stdio transport.
 
 > [!NOTE]
-> **AI Transparency Disclosure:** This project utilizes AI coding assistants to generate boilerplates, optimize benchmarks, and refine documentation. All critical logic and performance calculations are human-reviewed and verified.
+> **AI Transparency Disclosure:** This project utilized AI coding assistants to generate the POC
 
 
 Third-party proof of concept — not affiliated with OpenBeta, and not a replacement for the official
