@@ -135,9 +135,21 @@ Tests against the live API are opt-in, so the default run is deterministic:
 OPENBETA_LIVE=1 go test -run Live -v ./internal/openbeta
 ```
 
-CI runs fmt, vet, build and the offline tests on every push. The live tests run nightly (02:00 PST)
-rather than per-push — they exist to catch upstream schema drift, and the API is a free service run
-by volunteers.
+There is an opt-in pre-commit hook that runs the same generated-code check locally:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+CI runs fmt, vet, build and the offline tests on every push, plus a check that the committed
+generated client matches the queries — edit a `.graphql` file without regenerating and the build
+fails.
+
+Two jobs run nightly (02:00 PST) rather than per-push, because the API is a free service run by
+volunteers: the live tests, and a schema-drift job that re-downloads the upstream schema and diffs
+it against the vendored copy. Both are `continue-on-error`, so upstream changes surface as a warning
+to act on rather than a blocked merge. When schema drift fires, commit the new schema and run
+`go generate ./...`.
 
 ## Layout
 

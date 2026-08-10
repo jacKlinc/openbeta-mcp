@@ -42,6 +42,16 @@ jobs:
       - name: build
         run: go build ./...
 
+      # Generated code is committed, and generation is not part of the build, so
+      # nothing else would notice a query edited without a regenerate.
+      - name: generated code is up to date
+        run: |
+          go generate ./...
+          if ! git diff --exit-code; then
+            echo "Generated code is stale. Run: go generate ./..."
+            exit 1
+          fi
+
       # Live tests are skipped unless OPENBETA_LIVE is set, so this run stays
       # offline and deterministic. See the live job below.
       - name: test
@@ -67,3 +77,35 @@ jobs:
         env:
           OPENBETA_LIVE: "1"
         run: go test -v -run Live ./internal/openbeta
+
+  # The vendored schema is a snapshot; upstream moves without telling us. Rather
+  # than fetch at build time, re-download nightly and report the diff. A red run
+  # here means the schema changed — read the diff, commit it, regenerate.
+  schema-drift:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: download upstream schema
+        run: npx --yes get-graphql-schema https://api.openbeta.io > schema/openbeta.graphql
+
+      - name: report schema drift
+        run: |
+          if ! git diff --exit-code -- schema/openbeta.graphql; then
+            echo "Upstream schema has changed. Commit the diff above and run: go generate ./..."
+            exit 1
+          fi
+
+      # A schema change that alters the shape of our queries shows up here as a
+      # diff in generated code, which is the part that actually breaks callers.
+      - name: regenerate against upstream schema
+        run: |
+          go generate ./...
+          git diff --exit-code -- internal/openbeta/generated/
