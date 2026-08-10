@@ -15,7 +15,16 @@ TypeScript server proposed in [RFC #487](https://github.com/OpenBeta/openbeta-gr
 
 ## Install
 
+**Add as a package:**
+
 ```bash
+go install github.com/jacKlinc/openbeta-mcp/cmd/openbeta-mcp@latest
+```
+
+**Fork and build:**
+```bash
+gh repo clone https://github.com/jacKlinc/openbeta-mcp
+cd openbeta-mcp
 go build -o openbeta-mcp ./cmd/openbeta-mcp
 ```
 
