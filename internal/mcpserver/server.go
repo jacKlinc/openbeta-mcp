@@ -8,10 +8,13 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"net/http"
 
+	"github.com/Khan/genqlient/graphql"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
+	"github.com/jacKlinc/openbeta-mcp/internal/openbeta/generated"
 )
 
 // defaultZoom returns individual crags rather than parent regions.
@@ -99,11 +102,20 @@ func handleCragsWithin(client *openbeta.Client) mcp.ToolHandlerFor[CragsWithinAr
 	}
 }
 
-func handleGetAreaDetails(client *openbeta.Client) mcp.ToolHandlerFor[GetAreaDetailsArgs, openbeta.AreaDetail] {
-	return func(ctx context.Context, _ *mcp.CallToolRequest, args GetAreaDetailsArgs) (*mcp.CallToolResult, openbeta.AreaDetail, error) {
-		area, err := client.GetArea(ctx, args.AreaID)
+func handleGetAreaDetails(client *openbeta.Client) mcp.ToolHandlerFor[GetAreaDetailsArgs, generated.GetAreaDetailsResponse] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, args GetAreaDetailsArgs) (*mcp.CallToolResult, generated.GetAreaDetailsResponse, error) {
+		client := graphql.NewClient(openbeta.DefaultEndpoint, http.DefaultClient)
+
+		// Stawamus Chief, Squamish
+		// const uuid = "8f267065-fc1a-59ce-bcf1-6e9335548363"
+
+		area, err := generated.GetAreaDetails(ctx, client, args.AreaID)
 		if err != nil {
-			return nil, openbeta.AreaDetail{}, fmt.Errorf("looking up area: %w", err)
+			return nil, generated.GetAreaDetailsResponse{}, err
+		}
+
+		if err != nil {
+			return nil, generated.GetAreaDetailsResponse{}, fmt.Errorf("looking up area: %w", err)
 		}
 		return nil, *area, nil
 	}

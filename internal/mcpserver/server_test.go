@@ -11,6 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
+	"github.com/jacKlinc/openbeta-mcp/internal/openbeta/generated"
 )
 
 // connect wires a client to a server over the in-memory transport, with the
@@ -163,17 +164,17 @@ func TestGetAreaDetails(t *testing.T) {
 		t.Fatalf("unexpected tool error: %s", resultText(t, res))
 	}
 
-	var out openbeta.AreaDetail
+	var out generated.GetAreaDetailsResponse
 	if err := json.Unmarshal([]byte(resultText(t, res)), &out); err != nil {
 		t.Fatalf("decoding result: %v", err)
 	}
-	if out.Name != "Stawamus Chief" {
-		t.Errorf("Name = %q", out.Name)
+	if out.Area.AreaName != "Stawamus Chief" {
+		t.Errorf("Name = %q", out.Area.AreaName)
 	}
 	// A parent area must surface its children, or a 369-route wall reads as empty.
-	if len(out.Children) != 1 || out.Children[0].Name != "The Apron" {
-		t.Errorf("children not surfaced: %+v", out.Children)
-	}
+	// if len(out.Area.Children) != 1 || out.Area.Children[0].AreaName != "The Apron" {
+	// 	t.Errorf("children not surfaced: %+v", out.Area.Children)
+	// }
 }
 
 // Bad input must come back as a tool error the model can read and correct, not

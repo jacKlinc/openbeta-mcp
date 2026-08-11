@@ -179,6 +179,8 @@ transport later is a change at the composition root rather than a fork of the ha
 - [Non-functional requirements](docs/non-functional-requirements.md) — how it should behave
 - [GraphQL findings](docs/graphql-findings.md) — what the live API actually returns, and where it
   is surprising
+- [genqlient migration notes](docs/genqclient/migration-notes.md) — open items in the switch from
+  the hand-written client to the generated one
 
 That last document is worth reading before touching the query layer. `Area.totalClimbs` is not a
 climb count and filtering on it discards most real crags; `zoom` changes which level of the
