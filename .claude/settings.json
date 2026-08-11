@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ps -eo pid,etime,cmd)",
+      "Bash(grep -i \"[o]penbeta-mcp$\")"
+    ]
+  }
+}
