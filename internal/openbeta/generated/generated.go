@@ -21,9 +21,6 @@ type CragsWithinCragsWithinArea struct {
 	// areaNames of this areas parents, traversing up the heirarchy to the root area.
 	PathTokens []string                           `json:"pathTokens"`
 	Metadata   CragsWithinCragsWithinAreaMetadata `json:"metadata"`
-	// The climbs that appear within this area. If this area is a leaf node, then these climbs can be understood
-	// as appearing physically on - rather than within - this area.
-	Climbs []CragsWithinCragsWithinAreaClimbsClimb `json:"climbs"`
 }
 
 // GetUuid returns CragsWithinCragsWithinArea.Uuid, and is useful for accessing the field via an interface.
@@ -42,25 +39,6 @@ func (v *CragsWithinCragsWithinArea) GetPathTokens() []string { return v.PathTok
 func (v *CragsWithinCragsWithinArea) GetMetadata() CragsWithinCragsWithinAreaMetadata {
 	return v.Metadata
 }
-
-// GetClimbs returns CragsWithinCragsWithinArea.Climbs, and is useful for accessing the field via an interface.
-func (v *CragsWithinCragsWithinArea) GetClimbs() []CragsWithinCragsWithinAreaClimbsClimb {
-	return v.Climbs
-}
-
-// CragsWithinCragsWithinAreaClimbsClimb includes the requested fields of the GraphQL type Climb.
-// The GraphQL type's documentation follows.
-//
-// A climbing route or a boulder problem
-type CragsWithinCragsWithinAreaClimbsClimb struct {
-	// The UUID of the climb is the field used for identification.
-	// The id field is used in internal database relations, most GQL
-	// queries will use the uuid field.
-	Uuid string `json:"uuid"`
-}
-
-// GetUuid returns CragsWithinCragsWithinAreaClimbsClimb.Uuid, and is useful for accessing the field via an interface.
-func (v *CragsWithinCragsWithinAreaClimbsClimb) GetUuid() string { return v.Uuid }
 
 // CragsWithinCragsWithinAreaMetadata includes the requested fields of the GraphQL type AreaMetadata.
 type CragsWithinCragsWithinAreaMetadata struct {
@@ -538,9 +516,6 @@ query CragsWithin ($filter: SearchWithinFilter) {
 			lng
 			leaf
 			isBoulder
-		}
-		climbs {
-			uuid
 		}
 	}
 }
