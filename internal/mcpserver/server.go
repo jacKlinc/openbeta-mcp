@@ -61,6 +61,8 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 			"safety-critical, say that it should be verified against a current local guidebook.",
 	})
 
+	gql_client := graphql.NewClient(openbeta.DefaultEndpoint, http.DefaultClient)
+
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "crags_within",
 		Description: "Find rock climbing areas inside a geographic bounding box. " +
@@ -68,7 +70,7 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 			"hierarchy, sorted with the largest crags first. Areas holding no climbs are " +
 			"omitted. Use this to answer 'what can I climb near here', then pass a returned " +
 			"uuid to get_area_details for the routes.",
-	}, handleCragsWithin(client))
+	}, handleCragsWithin(client, &gql_client))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "get_area_details",
@@ -78,12 +80,12 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 			"you descend through them to reach the routes. An empty climbs list with a " +
 			"populated children list means the routes are one level down, not that the area " +
 			"is empty.",
-	}, handleGetAreaDetails(client))
+	}, handleGetAreaDetails(client, &gql_client))
 
 	return server
 }
 
-func handleCragsWithin(client *openbeta.Client) mcp.ToolHandlerFor[CragsWithinArgs, generated.CragsWithinResponse] {
+func handleCragsWithin(client *openbeta.Client, gql_client *graphql.Client) mcp.ToolHandlerFor[CragsWithinArgs, generated.CragsWithinResponse] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, args CragsWithinArgs) (*mcp.CallToolResult, generated.CragsWithinResponse, error) {
 		bbox, err := openbeta.NewBBox(args.BBox)
 		if err != nil {
@@ -95,9 +97,7 @@ func handleCragsWithin(client *openbeta.Client) mcp.ToolHandlerFor[CragsWithinAr
 			zoom = *args.Zoom
 		}
 		filter := generated.SearchWithinFilter{Bbox: bbox[:], Zoom: zoom}
-		// TODO: pass graphql cleint to function
-		client := graphql.NewClient(openbeta.DefaultEndpoint, http.DefaultClient)
-		crags, err := generated.CragsWithin(ctx, client, filter)
+		crags, err := generated.CragsWithin(ctx, *gql_client, filter)
 		if err != nil {
 			return nil, generated.CragsWithinResponse{}, fmt.Errorf("looking up crags: %w", err)
 		}
@@ -115,14 +115,9 @@ func handleCragsWithin(client *openbeta.Client) mcp.ToolHandlerFor[CragsWithinAr
 	}
 }
 
-func handleGetAreaDetails(client *openbeta.Client) mcp.ToolHandlerFor[GetAreaDetailsArgs, generated.GetAreaDetailsResponse] {
+func handleGetAreaDetails(client *openbeta.Client, gql_client *graphql.Client) mcp.ToolHandlerFor[GetAreaDetailsArgs, generated.GetAreaDetailsResponse] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, args GetAreaDetailsArgs) (*mcp.CallToolResult, generated.GetAreaDetailsResponse, error) {
-		client := graphql.NewClient(openbeta.DefaultEndpoint, http.DefaultClient)
-
-		area, err := generated.GetAreaDetails(ctx, client, args.AreaID)
-		if err != nil {
-			return nil, generated.GetAreaDetailsResponse{}, err
-		}
+		area, err := generated.GetAreaDetails(ctx, *gql_client, args.AreaID)
 
 		if err != nil {
 			return nil, generated.GetAreaDetailsResponse{}, fmt.Errorf("looking up area: %w", err)
