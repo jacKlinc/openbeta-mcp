@@ -81,33 +81,32 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 	return server
 }
 
-func handleCragsWithin(client *openbeta.Client) mcp.ToolHandlerFor[CragsWithinArgs, CragsWithinResult] {
-	return func(ctx context.Context, _ *mcp.CallToolRequest, args CragsWithinArgs) (*mcp.CallToolResult, CragsWithinResult, error) {
+func handleCragsWithin(client *openbeta.Client) mcp.ToolHandlerFor[CragsWithinArgs, generated.CragsWithinResponse] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, args CragsWithinArgs) (*mcp.CallToolResult, generated.CragsWithinResponse, error) {
 		bbox, err := openbeta.NewBBox(args.BBox)
 		if err != nil {
-			return nil, CragsWithinResult{}, err
+			return nil, generated.CragsWithinResponse{}, err
 		}
 
 		zoom := float64(defaultZoom)
 		if args.Zoom != nil {
 			zoom = *args.Zoom
 		}
-
-		crags, err := client.CragsWithin(ctx, bbox, zoom)
+		filter := generated.SearchWithinFilter{Bbox: bbox[:], Zoom: zoom}
+		// TODO: pass graphql cleint to function
+		client := graphql.NewClient(openbeta.DefaultEndpoint, http.DefaultClient)
+		crags, err := generated.CragsWithin(ctx, client, filter)
 		if err != nil {
-			return nil, CragsWithinResult{}, fmt.Errorf("looking up crags: %w", err)
+			return nil, generated.CragsWithinResponse{}, fmt.Errorf("looking up crags: %w", err)
 		}
 
-		return nil, CragsWithinResult{Crags: crags, Count: len(crags)}, nil
+		return nil, *crags, nil
 	}
 }
 
 func handleGetAreaDetails(client *openbeta.Client) mcp.ToolHandlerFor[GetAreaDetailsArgs, generated.GetAreaDetailsResponse] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, args GetAreaDetailsArgs) (*mcp.CallToolResult, generated.GetAreaDetailsResponse, error) {
 		client := graphql.NewClient(openbeta.DefaultEndpoint, http.DefaultClient)
-
-		// Stawamus Chief, Squamish
-		// const uuid = "8f267065-fc1a-59ce-bcf1-6e9335548363"
 
 		area, err := generated.GetAreaDetails(ctx, client, args.AreaID)
 		if err != nil {
