@@ -39,6 +39,17 @@ func WithHTTPClient(h *http.Client) Option {
 	return func(c *Client) { c.http = h }
 }
 
+// Endpoint reports the GraphQL endpoint this Client targets.
+//
+// Exposed so callers building a genqlient client can inherit the configured
+// endpoint rather than reaching for DefaultEndpoint — that is what made
+// WithEndpoint silently ineffective, and tests hit the live API.
+func (c *Client) Endpoint() string { return c.endpoint }
+
+// HTTPClient reports the underlying HTTP client, carrying the configured
+// timeout (and, once added, the retrying transport — see docs/retry.md).
+func (c *Client) HTTPClient() *http.Client { return c.http }
+
 // New returns a Client pointed at the public API unless overridden.
 func New(opts ...Option) *Client {
 	c := &Client{

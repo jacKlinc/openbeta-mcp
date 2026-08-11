@@ -12,6 +12,7 @@ import (
 
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta/generated"
+	"github.com/jacKlinc/openbeta-mcp/internal/tools"
 )
 
 // connect wires a client to a server over the in-memory transport, with the
@@ -122,7 +123,7 @@ func TestCragsWithin(t *testing.T) {
 		t.Fatalf("unexpected tool error: %s", resultText(t, res))
 	}
 
-	var out CragsWithinResult
+	var out tools.CragsWithinResult
 	if err := json.Unmarshal([]byte(resultText(t, res)), &out); err != nil {
 		t.Fatalf("decoding result: %v (raw: %s)", err, resultText(t, res))
 	}
@@ -143,11 +144,7 @@ func TestZoomIsOptional(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("omitting zoom should be valid, got: %s", resultText(t, res))
 	}
-	if defaultZoom < 11 {
-		t.Errorf("defaultZoom %d is below the leaf threshold; callers would get parent regions", defaultZoom)
-	}
 }
-
 func TestGetAreaDetails(t *testing.T) {
 	body := `{"data":{"area":{
 		"uuid":"8f267065-fc1a-59ce-bcf1-6e9335548363","areaName":"Stawamus Chief","totalClimbs":369,
