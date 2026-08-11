@@ -1,0 +1,56 @@
+query GetAreaDetails($uuid: ID!){
+    area(uuid: $uuid){
+        uuid
+        areaName
+        totalClimbs
+        gradeContext
+        pathTokens
+        metadata {
+            lat
+            lng
+            leaf
+            isBoulder
+        }
+        content {
+            description
+        }
+        children {
+            uuid
+            areaName
+            totalClimbs
+            metadata {
+                lat
+                lng
+                leaf
+            }
+        }
+        climbs {
+            uuid
+            name
+            fa
+            length
+            safety
+            type{
+                sport
+                trad
+                bouldering
+                alpine
+                aid
+                tr
+                ice
+                mixed
+                snow
+                deepwatersolo
+            }
+            grades {
+                yds
+                vscale
+                font
+                french
+                uiaa
+                ewbank
+                wi
+            }
+        }
+    }
+}
