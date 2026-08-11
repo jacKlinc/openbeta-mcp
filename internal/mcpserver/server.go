@@ -85,11 +85,11 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 	return server
 }
 
-func handleCragsWithin(client *openbeta.Client, gql_client *graphql.Client) mcp.ToolHandlerFor[CragsWithinArgs, generated.CragsWithinResponse] {
-	return func(ctx context.Context, _ *mcp.CallToolRequest, args CragsWithinArgs) (*mcp.CallToolResult, generated.CragsWithinResponse, error) {
+func handleCragsWithin(client *openbeta.Client, gql_client *graphql.Client) mcp.ToolHandlerFor[CragsWithinArgs, []openbeta.CragSummary] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, args CragsWithinArgs) (*mcp.CallToolResult, []openbeta.CragSummary, error) {
 		bbox, err := openbeta.NewBBox(args.BBox)
 		if err != nil {
-			return nil, generated.CragsWithinResponse{}, err
+			return nil, nil, err
 		}
 
 		zoom := float64(defaultZoom)
@@ -99,19 +99,40 @@ func handleCragsWithin(client *openbeta.Client, gql_client *graphql.Client) mcp.
 		filter := generated.SearchWithinFilter{Bbox: bbox[:], Zoom: zoom}
 		crags, err := generated.CragsWithin(ctx, *gql_client, filter)
 		if err != nil {
-			return nil, generated.CragsWithinResponse{}, fmt.Errorf("looking up crags: %w", err)
+			return nil, nil, fmt.Errorf("looking up crags: %w", err)
 		}
-		// Sort by totalClimbs
+		// Delete areas with no climbs
+		crags.CragsWithin = slices.DeleteFunc(crags.CragsWithin, func(a generated.CragsWithinCragsWithinArea) bool {
+			return climbCount(a) == 0
+		})
+		// Sort by climbCount
 		slices.SortFunc(crags.CragsWithin, func(a, b generated.CragsWithinCragsWithinArea) int {
-			return cmp.Compare(b.TotalClimbs, a.TotalClimbs)
+			return cmp.Compare(climbCount(b), climbCount(a))
 		})
 		// Get top 20 to reduce output for AI
 		const maxCrags = 20
 		if len(crags.CragsWithin) > maxCrags {
 			crags.CragsWithin = crags.CragsWithin[:maxCrags]
 		}
+		// Drops the climbs array
+		out := make([]openbeta.CragSummary, 0, len(crags.CragsWithin))
+		for _, a := range crags.CragsWithin {
+			// Skips empty
+			if !hasClimbs(a) {
+				continue
+			}
+			out = append(out, openbeta.CragSummary{
+				UUID:       a.Uuid,
+				Name:       a.AreaName,
+				Lat:        a.Metadata.Lat,
+				Lng:        a.Metadata.Lng,
+				ClimbCount: climbCount(a),
+				IsBoulder:  a.Metadata.IsBoulder,
+				Path:       a.PathTokens,
+			})
+		}
 
-		return nil, *crags, nil
+		return nil, out, nil
 	}
 }
 
@@ -124,4 +145,19 @@ func handleGetAreaDetails(client *openbeta.Client, gql_client *graphql.Client) m
 		}
 		return nil, *area, nil
 	}
+}
+
+// TODO: refactor me
+func climbCount(a generated.CragsWithinCragsWithinArea) int {
+	if n := len(a.Climbs); n > 0 {
+		return n
+	}
+	if a.TotalClimbs > 0 {
+		return a.TotalClimbs
+	}
+	return 0
+}
+
+func hasClimbs(a generated.CragsWithinCragsWithinArea) bool {
+	return climbCount(a) > 0
 }

@@ -10,5 +10,8 @@ query CragsWithin($filter: SearchWithinFilter) {
       leaf
       isBoulder
     }
+    climbs { 
+      uuid 
+    }
   }
 }
