@@ -6,9 +6,11 @@
 package mcpserver
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/Khan/genqlient/graphql"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -98,6 +100,15 @@ func handleCragsWithin(client *openbeta.Client) mcp.ToolHandlerFor[CragsWithinAr
 		crags, err := generated.CragsWithin(ctx, client, filter)
 		if err != nil {
 			return nil, generated.CragsWithinResponse{}, fmt.Errorf("looking up crags: %w", err)
+		}
+		// Sort by totalClimbs
+		slices.SortFunc(crags.CragsWithin, func(a, b generated.CragsWithinCragsWithinArea) int {
+			return cmp.Compare(b.TotalClimbs, a.TotalClimbs)
+		})
+		// Get top 20 to reduce output for AI
+		const maxCrags = 20
+		if len(crags.CragsWithin) > maxCrags {
+			crags.CragsWithin = crags.CragsWithin[:maxCrags]
 		}
 
 		return nil, *crags, nil
