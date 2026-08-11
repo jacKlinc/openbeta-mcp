@@ -39,7 +39,7 @@ type CragsWithinResult struct {
 
 func HandleCragsWithin(gqlClient *graphql.Client) mcp.ToolHandlerFor[CragsWithinArgs, CragsWithinResult] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, args CragsWithinArgs) (*mcp.CallToolResult, CragsWithinResult, error) {
-		bbox, err := openbeta.NewBBox(args.BBox)
+		bbox, err := NewBBox(args.BBox)
 		if err != nil {
 			return nil, CragsWithinResult{}, err
 		}
@@ -110,4 +110,41 @@ func climbCount(a generated.CragsWithinCragsWithinArea) int {
 
 func hasClimbs(a generated.CragsWithinCragsWithinArea) bool {
 	return climbCount(a) > 0
+}
+
+// BBox is a geographic bounding box in the order the OpenBeta API expects:
+// [minLng, minLat, maxLng, maxLat]. Longitude first — the schema types this as a
+// bare [Float], so nothing upstream will catch a swapped pair.
+type BBox [4]float64
+
+func (b BBox) MinLng() float64 { return b[0] }
+func (b BBox) MinLat() float64 { return b[1] }
+func (b BBox) MaxLng() float64 { return b[2] }
+func (b BBox) MaxLat() float64 { return b[3] }
+
+// Validate rejects malformed boxes before any upstream call (FR-18).
+func (b BBox) Validate() error {
+	if b.MinLng() < -180 || b.MaxLng() > 180 {
+		return fmt.Errorf("longitude out of range: got [%g, %g], must be within [-180, 180]", b.MinLng(), b.MaxLng())
+	}
+	if b.MinLat() < -90 || b.MaxLat() > 90 {
+		return fmt.Errorf("latitude out of range: got [%g, %g], must be within [-90, 90]", b.MinLat(), b.MaxLat())
+	}
+	if b.MinLng() > b.MaxLng() {
+		return fmt.Errorf("minLng (%g) is greater than maxLng (%g); bbox order is [minLng, minLat, maxLng, maxLat]", b.MinLng(), b.MaxLng())
+	}
+	if b.MinLat() > b.MaxLat() {
+		return fmt.Errorf("minLat (%g) is greater than maxLat (%g); bbox order is [minLng, minLat, maxLng, maxLat]", b.MinLat(), b.MaxLat())
+	}
+	return nil
+}
+
+// NewBBox builds a BBox from a slice, enforcing the length (FR-18).
+func NewBBox(v []float64) (BBox, error) {
+	var b BBox
+	if len(v) != 4 {
+		return b, fmt.Errorf("bbox must have exactly 4 elements [minLng, minLat, maxLng, maxLat], got %d", len(v))
+	}
+	copy(b[:], v)
+	return b, b.Validate()
 }
