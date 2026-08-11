@@ -100,6 +100,7 @@ func TestLiveZoomThreshold(t *testing.T) {
 			leafZoomThreshold, len(leaves), len(parents))
 	}
 }
+
 /* TODO: fix me
 func TestLiveGetAreaParent(t *testing.T) {
 	c, ctx := liveClient(t)
