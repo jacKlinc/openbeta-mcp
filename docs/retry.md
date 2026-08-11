@@ -4,14 +4,27 @@ Design note. Not yet implemented.
 
 ## Why
 
-`api.openbeta.io` sits behind Cloudflare and fails transiently. Both shapes observed in one
+`api.openbeta.io` sits behind Cloudflare and fails transiently. Three shapes observed in one
 session, same bbox that had succeeded minutes earlier:
 
 - `Post "https://api.openbeta.io/graphql": unexpected EOF` — connection dropped mid-response.
 - `502` with body `{"data":null,"errors":[{"message":"error code: 502\n"}]}`.
+- `503` with an nginx `503 Service Temporarily Unavailable` **HTML page** — including a
+  Cloudflare beacon `<script>` — carried inside `errors[].message`.
 
 Each surfaced to the MCP client as a bare tool error. A model consuming that has nothing to act
-on, and the user sees a failure for a query that would have worked on the next attempt.
+on, and the user sees a failure for a query that would have worked on the next attempt. The 503
+is worse than useless: several hundred characters of markup and a CDN script tag land in the
+tool result for the model to read.
+
+The 503 also breaks the neat split assumed below. An infrastructure error arrives wearing GraphQL
+clothes — an `errors` array — so the retry decision cannot key on the presence of `errors` alone.
+Branch on **HTTP status first**, as `execute` already does, and treat `errors` as authoritative
+only on a 2xx. A non-2xx body should never be parsed as a GraphQL envelope.
+
+Whatever surfaces to the caller should be truncated; `truncate(raw, 200)` in
+[client.go](../internal/openbeta/client.go) is the right instinct, but the genqlient path does
+not currently apply it.
 
 ## Where
 
@@ -23,14 +36,15 @@ Requests are read-only POSTs (GraphQL queries, no mutations), so replay is safe.
 
 ## What to retry
 
-| Condition                            | Retry |
-| ------------------------------------ | ----- |
-| Transport error (EOF, reset, dial)   | yes   |
-| 502, 503, 504                        | yes   |
-| 429                                  | yes, honour `Retry-After` |
-| Other 4xx                            | no — our bug, replay repeats it |
-| 200 with GraphQL `errors`            | no — upstream understood and declined |
-| `context.Canceled` / `DeadlineExceeded` | no |
+| Condition                               | Retry                                 |
+| --------------------------------------- | ------------------------------------- |
+| Transport error (EOF, reset, dial)      | yes                                   |
+| 502, 503, 504                           | yes                                   |
+| 429                                     | yes, honour `Retry-After`             |
+| Other 4xx                               | no — our bug, replay repeats it       |
+| 2xx with GraphQL `errors`               | no — upstream understood and declined |
+| Non-2xx with a GraphQL-shaped body      | yes — status wins; CDN noise, not a verdict |
+| `context.Canceled` / `DeadlineExceeded` | no                                    |
 
 ## Budget
 
