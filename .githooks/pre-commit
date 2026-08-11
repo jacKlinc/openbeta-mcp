@@ -8,6 +8,13 @@ set -euo pipefail
 
 go generate ./... >/dev/null
 
+# Fixes all files in dir that need a format
+gofmt -w .
+# Recursively vets all code in dir for dodgy structs
+go vet ./...
+# Recursively compiles all code in dir 	
+go build ./...
+
 if ! git diff --quiet -- internal/openbeta/generated/; then
 	echo "pre-commit: generated client is out of date."
 	echo "Regenerated files:"
