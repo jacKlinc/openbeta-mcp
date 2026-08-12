@@ -14,6 +14,9 @@ gofmt -w .
 go vet ./...
 # Recursively compiles all code in dir 	
 go build ./...
+# Recursively runs tests in all code in dir 	
+go test ./...
+
 
 if ! git diff --quiet -- internal/openbeta/generated/; then
 	echo "pre-commit: generated client is out of date."
