@@ -55,11 +55,11 @@ func HandleCragsWithin(gqlClient *graphql.Client) mcp.ToolHandlerFor[CragsWithin
 		}
 		// Delete areas with no climbs
 		crags.CragsWithin = slices.DeleteFunc(crags.CragsWithin, func(a generated.CragsWithinCragsWithinArea) bool {
-			return climbCount(a) == 0
+			return ClimbCount(a) == 0
 		})
 		// Sort by climbCount
 		slices.SortFunc(crags.CragsWithin, func(a, b generated.CragsWithinCragsWithinArea) int {
-			return cmp.Compare(climbCount(b), climbCount(a))
+			return cmp.Compare(ClimbCount(b), ClimbCount(a))
 		})
 		// Get top 20 to reduce output for AI
 		const maxCrags = 20
@@ -78,7 +78,7 @@ func HandleCragsWithin(gqlClient *graphql.Client) mcp.ToolHandlerFor[CragsWithin
 				Name:       a.AreaName,
 				Lat:        a.Metadata.Lat,
 				Lng:        a.Metadata.Lng,
-				ClimbCount: climbCount(a),
+				ClimbCount: ClimbCount(a),
 				IsBoulder:  a.Metadata.IsBoulder,
 				Path:       a.PathTokens,
 			})
@@ -88,7 +88,7 @@ func HandleCragsWithin(gqlClient *graphql.Client) mcp.ToolHandlerFor[CragsWithin
 	}
 }
 
-// climbCount reports how many climbs an area holds.
+// ClimbCount reports how many climbs an area holds.
 //
 // Area.totalClimbs is unreliable and cannot be used for this. It reads 0 on most
 // leaf crags that plainly have climbs — Tantalus Wall reports totalClimbs 0 with
@@ -98,7 +98,7 @@ func HandleCragsWithin(gqlClient *graphql.Client) mcp.ToolHandlerFor[CragsWithin
 //
 // So: count climbs for leaf areas, and fall back to totalClimbs for parents,
 // whose own climbs array is always empty.
-func climbCount(a generated.CragsWithinCragsWithinArea) int {
+func ClimbCount(a generated.CragsWithinCragsWithinArea) int {
 	if n := len(a.Climbs); n > 0 {
 		return n
 	}
@@ -109,7 +109,7 @@ func climbCount(a generated.CragsWithinCragsWithinArea) int {
 }
 
 func hasClimbs(a generated.CragsWithinCragsWithinArea) bool {
-	return climbCount(a) > 0
+	return ClimbCount(a) > 0
 }
 
 // BBox is a geographic bounding box in the order the OpenBeta API expects:

@@ -7,48 +7,6 @@ import (
 	"testing"
 )
 
-// The central finding behind climbCount: Area.totalClimbs reads 0 on most leaf
-// crags that have climbs. Filtering on it discards real crags — 143 of 176 in the
-// measured Squamish bbox. These cases are taken from live responses.
-func TestClimbCountIgnoresUnreliableTotalClimbs(t *testing.T) {
-	tests := []struct {
-		name string
-		area area
-		want int
-	}{
-		{
-			// Tantalus Wall, a real multi-pitch wall.
-			name: "leaf crag with climbs but totalClimbs 0",
-			area: area{TotalClimbs: 0, Climbs: make([]climb, 8)},
-			want: 8,
-		},
-		{
-			// Stawamus Chief: climbs live on its 32 children.
-			name: "parent area with totalClimbs and no climbs of its own",
-			area: area{TotalClimbs: 369, Climbs: nil},
-			want: 369,
-		},
-		{
-			name: "genuinely empty area",
-			area: area{TotalClimbs: 0, Climbs: nil},
-			want: 0,
-		},
-		{
-			// Apron Boulders, where the two agree.
-			name: "both populated and in agreement",
-			area: area{TotalClimbs: 55, Climbs: make([]climb, 55)},
-			want: 55,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := climbCount(tt.area); got != tt.want {
-				t.Errorf("climbCount() = %d, want %d", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestCragsWithinDropsOnlyTrulyEmptyAreas(t *testing.T) {
 	body := `{"data":{"cragsWithin":[
 		{"uuid":"a","areaName":"Tantalus Wall","totalClimbs":0,"metadata":{"lat":49.68,"lng":-123.14},"climbs":[{"uuid":"c1"},{"uuid":"c2"}]},

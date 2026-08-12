@@ -114,10 +114,6 @@ type cragsWithinData struct {
 	CragsWithin []area `json:"cragsWithin"`
 }
 
-type areaData struct {
-	Area *area `json:"area"`
-}
-
 // Output types: what MCP clients actually receive. Trimmed for token economy and
 // signal-to-noise (NFR-11).
 
@@ -130,37 +126,4 @@ type CragSummary struct {
 	ClimbCount int      `json:"climbCount"`
 	IsBoulder  bool     `json:"isBoulder,omitempty"`
 	Path       []string `json:"path,omitempty"`
-}
-
-// AreaDetail is the get_area_details result.
-type AreaDetail struct {
-	UUID        string         `json:"uuid"`
-	Name        string         `json:"name"`
-	Path        []string       `json:"path,omitempty"`
-	Lat         float64        `json:"lat"`
-	Lng         float64        `json:"lng"`
-	Description string         `json:"description,omitempty"`
-	GradeSystem string         `json:"gradeSystem,omitempty"`
-	IsBoulder   bool           `json:"isBoulder,omitempty"`
-	Climbs      []ClimbSummary `json:"climbs,omitempty"`
-	Children    []ChildArea    `json:"children,omitempty"`
-}
-
-// ClimbSummary is one route within an area.
-type ClimbSummary struct {
-	UUID        string   `json:"uuid"`
-	Name        string   `json:"name"`
-	Grade       string   `json:"grade,omitempty"`
-	Disciplines []string `json:"disciplines,omitempty"`
-	Length      int      `json:"length,omitempty"`
-	FA          string   `json:"fa,omitempty"`
-	Safety      string   `json:"safety,omitempty"`
-}
-
-// ChildArea is a sub-area of an area that holds no climbs of its own.
-type ChildArea struct {
-	UUID string  `json:"uuid"`
-	Name string  `json:"name"`
-	Lat  float64 `json:"lat,omitempty"`
-	Lng  float64 `json:"lng,omitempty"`
 }
