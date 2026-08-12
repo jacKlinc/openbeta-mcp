@@ -20,7 +20,12 @@ func HandleGetAreaDetails(gqlClient *graphql.Client) mcp.ToolHandlerFor[GetAreaD
 	return func(ctx context.Context, _ *mcp.CallToolRequest, args GetAreaDetailsArgs) (*mcp.CallToolResult, generated.GetAreaDetailsResponse, error) {
 		// Validated here rather than upstream: the API answers a malformed UUID
 		// with "area Invalid UUID.", which does not tell a model what to fix.
-		if _, err := uuid.Parse(args.AreaID); err != nil {
+		//
+		// uuid.Parse alone is too lenient — it accepts the dashless 32-hex form,
+		// urn:uuid: prefixes and brace-wrapped values, none of which the API
+		// takes. Every UUID a caller gets from crags_within is canonical, so
+		// require that form and reject the rest here.
+		if _, err := uuid.Parse(args.AreaID); err != nil || len(args.AreaID) != 36 {
 			return nil, generated.GetAreaDetailsResponse{}, fmt.Errorf("areaId %q is not a valid UUID: expected 8-4-4-4-12 hex form, e.g. 8f267065-fc1a-59ce-bcf1-6e9335548363", args.AreaID)
 		}
 

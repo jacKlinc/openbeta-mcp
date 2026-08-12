@@ -37,54 +37,61 @@ type CragsWithinResult struct {
 	Count int                    `json:"count"`
 }
 
-func HandleCragsWithin(gqlClient *graphql.Client) mcp.ToolHandlerFor[CragsWithinArgs, CragsWithinResult] {
+// core: no MCP types, returns a plain error
+func cragsWithin(ctx context.Context, gql graphql.Client, args CragsWithinArgs) (CragsWithinResult, error) {
+	bbox, err := NewBBox(args.BBox)
+	if err != nil {
+		return CragsWithinResult{}, err
+	}
+
+	zoom := float64(defaultZoom)
+	if args.Zoom != nil {
+		zoom = *args.Zoom
+	}
+	filter := generated.SearchWithinFilter{Bbox: bbox[:], Zoom: zoom}
+	crags, err := generated.CragsWithin(ctx, gql, filter)
+	if err != nil {
+		return CragsWithinResult{}, err
+	}
+	// Delete areas with no climbs
+	crags.CragsWithin = slices.DeleteFunc(crags.CragsWithin, func(a generated.CragsWithinCragsWithinArea) bool {
+		return ClimbCount(a) == 0
+	})
+	// Sort by climbCount
+	slices.SortFunc(crags.CragsWithin, func(a, b generated.CragsWithinCragsWithinArea) int {
+		return cmp.Compare(ClimbCount(b), ClimbCount(a))
+	})
+	// Get top 20 to reduce output for AI
+	const maxCrags = 20
+	if len(crags.CragsWithin) > maxCrags {
+		crags.CragsWithin = crags.CragsWithin[:maxCrags]
+	}
+	// Drops the climbs array
+	out := make([]openbeta.CragSummary, 0, len(crags.CragsWithin))
+	for _, a := range crags.CragsWithin {
+		// Skips empty
+		if !hasClimbs(a) {
+			continue
+		}
+		out = append(out, openbeta.CragSummary{
+			UUID:       a.Uuid,
+			Name:       a.AreaName,
+			Lat:        a.Metadata.Lat,
+			Lng:        a.Metadata.Lng,
+			ClimbCount: ClimbCount(a),
+			IsBoulder:  a.Metadata.IsBoulder,
+			Path:       a.PathTokens,
+		})
+	}
+
+	return CragsWithinResult{Crags: out, Count: len(out)}, nil
+}
+
+// adapter: MCP signature, no logic
+func HandleCragsWithin(gql *graphql.Client) mcp.ToolHandlerFor[CragsWithinArgs, CragsWithinResult] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, args CragsWithinArgs) (*mcp.CallToolResult, CragsWithinResult, error) {
-		bbox, err := NewBBox(args.BBox)
-		if err != nil {
-			return nil, CragsWithinResult{}, err
-		}
-
-		zoom := float64(defaultZoom)
-		if args.Zoom != nil {
-			zoom = *args.Zoom
-		}
-		filter := generated.SearchWithinFilter{Bbox: bbox[:], Zoom: zoom}
-		crags, err := generated.CragsWithin(ctx, *gqlClient, filter)
-		if err != nil {
-			return nil, CragsWithinResult{}, fmt.Errorf("looking up crags: %w", err)
-		}
-		// Delete areas with no climbs
-		crags.CragsWithin = slices.DeleteFunc(crags.CragsWithin, func(a generated.CragsWithinCragsWithinArea) bool {
-			return ClimbCount(a) == 0
-		})
-		// Sort by climbCount
-		slices.SortFunc(crags.CragsWithin, func(a, b generated.CragsWithinCragsWithinArea) int {
-			return cmp.Compare(ClimbCount(b), ClimbCount(a))
-		})
-		// Get top 20 to reduce output for AI
-		const maxCrags = 20
-		if len(crags.CragsWithin) > maxCrags {
-			crags.CragsWithin = crags.CragsWithin[:maxCrags]
-		}
-		// Drops the climbs array
-		out := make([]openbeta.CragSummary, 0, len(crags.CragsWithin))
-		for _, a := range crags.CragsWithin {
-			// Skips empty
-			if !hasClimbs(a) {
-				continue
-			}
-			out = append(out, openbeta.CragSummary{
-				UUID:       a.Uuid,
-				Name:       a.AreaName,
-				Lat:        a.Metadata.Lat,
-				Lng:        a.Metadata.Lng,
-				ClimbCount: ClimbCount(a),
-				IsBoulder:  a.Metadata.IsBoulder,
-				Path:       a.PathTokens,
-			})
-		}
-
-		return nil, CragsWithinResult{Crags: out, Count: len(out)}, nil
+		out, err := cragsWithin(ctx, *gql, args)
+		return nil, out, err
 	}
 }
 
