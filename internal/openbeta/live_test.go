@@ -9,6 +9,7 @@ import (
 	"github.com/Khan/genqlient/graphql"
 
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
+	"github.com/jacKlinc/openbeta-mcp/internal/openbeta/generated"
 	"github.com/jacKlinc/openbeta-mcp/internal/tools"
 )
 
@@ -127,60 +128,62 @@ func TestLiveZoomThreshold(t *testing.T) {
 	}
 }
 
-/* TODO: fix me
 func TestLiveGetAreaParent(t *testing.T) {
-	c, ctx, _ := liveClient(t)
+	_, ctx, gql := liveClient(t)
+	h := tools.HandleGetAreaDetails(gql)
 
-	got, err := c.GetArea(ctx, stawamusChief)
+	_, got, err := h(ctx, nil, tools.GetAreaDetailsArgs{AreaID: stawamusChief})
 	if err != nil {
 		t.Fatalf("GetArea: %v", err)
 	}
-	if got.Name != "Stawamus Chief" {
-		t.Errorf("Name = %q, want Stawamus Chief", got.Name)
+	if got.Area.AreaName != "Stawamus Chief" {
+		t.Errorf("Name = %q, want Stawamus Chief", got.Area.AreaName)
 	}
-	if got.Lat == 0 || got.Lng == 0 {
-		t.Errorf("missing coordinates: (%g, %g)", got.Lat, got.Lng)
+	if got.Area.Metadata.Lat == 0 || got.Area.Metadata.Lng == 0 {
+		t.Errorf("missing coordinates: (%g, %g)", got.Area.Metadata.Lat, got.Area.Metadata.Lng)
 	}
 	// The Chief holds no climbs directly; they live on its children.
-	if len(got.Children) == 0 {
+	if len(got.Area.Children) == 0 {
 		t.Error("expected children for a parent area")
 	}
-	if len(got.Path) == 0 {
+	if len(got.Area.PathTokens) == 0 {
 		t.Error("expected pathTokens")
 	}
 }
 
-
 // Descending one level from a parent must reach climbs with names and grades.
 func TestLiveGetAreaLeafHasClimbs(t *testing.T) {
-	c, ctx, _ := liveClient(t)
+	_, ctx, gql := liveClient(t)
+	h := tools.HandleGetAreaDetails(gql)
 
-	parent, err := c.GetArea(ctx, stawamusChief)
+	_, parent, err := h(ctx, nil, tools.GetAreaDetailsArgs{AreaID: stawamusChief})
 	if err != nil {
 		t.Fatalf("GetArea parent: %v", err)
 	}
 
 	var found bool
-	for _, ch := range parent.Children {
-		child, err := c.GetArea(ctx, ch.UUID)
+	for _, ch := range parent.Area.Children {
+		_, child, err := h(ctx, nil, tools.GetAreaDetailsArgs{AreaID: ch.Uuid})
 		if err != nil {
-			t.Fatalf("GetArea child %s: %v", ch.UUID, err)
+			t.Fatalf("GetArea child %s: %v", ch.Uuid, err)
 		}
-		if len(child.Climbs) == 0 {
+		if len(child.Area.Climbs) == 0 {
 			continue
 		}
 		found = true
 		var graded int
-		for _, cl := range child.Climbs {
+		for _, cl := range child.Area.Climbs {
 			if cl.Name == "" {
-				t.Errorf("climb %s has no name", cl.UUID)
+				t.Errorf("climb %s has no name", cl.Uuid)
 			}
-			if cl.Grade != "" {
+			if anyGrade(cl.Grades) != "" {
 				graded++
 			}
 		}
+		// Individual ungraded climbs are ordinary — a whole crag of them is not,
+		// and means the grades selection stopped decoding.
 		if graded == 0 {
-			t.Errorf("no climb in %q carries a grade", child.Name)
+			t.Errorf("no climb in %q carries a grade in any system", child.Area.AreaName)
 		}
 		break
 	}
@@ -189,15 +192,28 @@ func TestLiveGetAreaLeafHasClimbs(t *testing.T) {
 	}
 }
 
-func TestLiveGetAreaNotFound(t *testing.T) {
-	c, ctx, _ := liveClient(t)
+// anyGrade returns the first populated grade string, whichever system it is in.
+// Which sibling is filled depends on the area's gradeContext and the climb type
+// — YDS for Squamish trad, vscale for its boulders, the rest empty — so the test
+// asks whether the climb is graded at all rather than picking one field.
+func anyGrade(g generated.GetAreaDetailsAreaClimbsClimbGradesGradeType) string {
+	for _, s := range []string{g.Yds, g.Vscale, g.Font, g.French, g.Uiaa, g.Ewbank, g.Wi} {
+		if s != "" {
+			return s
+		}
+	}
+	return ""
+}
 
-	_, err := c.GetArea(ctx, "00000000-0000-0000-0000-000000000000")
+func TestLiveGetAreaNotFound(t *testing.T) {
+	_, ctx, gql := liveClient(t)
+	h := tools.HandleGetAreaDetails(gql)
+
+	_, _, err := h(ctx, nil, tools.GetAreaDetailsArgs{AreaID: "00000000-0000-0000-0000-000000000000"})
 	if err == nil {
 		t.Fatal("expected an error for a nonexistent area")
 	}
 }
-*/
 
 // An ocean bbox is a legitimately empty answer, not a failure.
 func TestLiveEmptyBBox(t *testing.T) {
