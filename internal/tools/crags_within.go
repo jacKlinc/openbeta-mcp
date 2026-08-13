@@ -21,6 +21,12 @@ import (
 // here" almost always wants crags.
 const defaultZoom = 13
 
+// MaxCrags caps how many crags a single call returns. A metro bbox at leaf zoom
+// yields ~180 areas, which is more context than a model can usefully read, so
+// only the densest are kept. Count reports the number actually returned, so it
+// never exceeds this.
+const MaxCrags = 20
+
 // CragsWithinArgs is the input schema for crags_within.
 //
 // The bbox description carries the element ordering because the upstream schema
@@ -28,13 +34,17 @@ const defaultZoom = 13
 // transposed pair is the easiest mistake for a caller to make (NFR-12).
 type CragsWithinArgs struct {
 	BBox []float64 `json:"bbox" jsonschema:"Bounding box as exactly four numbers in the order [minLng, minLat, maxLng, maxLat]. Longitude comes first. Example for Squamish, BC: [-123.2, 49.6, -122.9, 49.8]"`
-	Zoom *float64  `json:"zoom,omitempty" jsonschema:"Map zoom level controlling which level of the area hierarchy is returned. 11 or above returns individual crags; below 11 returns larger parent regions. Defaults to 13."`
+	// TODO: why is this a float64 pointer? Would int64 not be better
+	Zoom *float64 `json:"zoom,omitempty" jsonschema:"Map zoom level controlling which level of the area hierarchy is returned. 11 or above returns individual crags; below 11 returns larger parent regions. Defaults to 13."`
 }
 
 // CragsWithinResult is the output schema for crags_within.
+//
+// Count and len(Crags) differ whenever the box holds more than MaxCrags: Count
+// is how many crags are in the box, Crags is the densest slice of them.
 type CragsWithinResult struct {
-	Crags []openbeta.CragSummary `json:"crags"`
-	Count int                    `json:"count"`
+	Crags []openbeta.CragSummary `json:"crags" jsonschema:"The crags returned, densest first. Capped at 20; when count exceeds that, this is only the top slice."`
+	Count int                    `json:"count" jsonschema:"How many crags with climbs are in the bounding box. May be larger than the crags array, which is capped at 20 — narrow the bbox or raise the zoom to see the rest."`
 }
 
 // core: no MCP types, returns a plain error
@@ -57,22 +67,20 @@ func cragsWithin(ctx context.Context, gql graphql.Client, args CragsWithinArgs) 
 	crags.CragsWithin = slices.DeleteFunc(crags.CragsWithin, func(a generated.CragsWithinCragsWithinArea) bool {
 		return ClimbCount(a) == 0
 	})
+	// Taken before truncation: Count reports how much is actually there, so a
+	// caller seeing count 183 against 20 crags knows it has the top slice.
+	count := len(crags.CragsWithin)
 	// Sort by climbCount
 	slices.SortFunc(crags.CragsWithin, func(a, b generated.CragsWithinCragsWithinArea) int {
 		return cmp.Compare(ClimbCount(b), ClimbCount(a))
 	})
-	// Get top 20 to reduce output for AI
-	const maxCrags = 20
-	if len(crags.CragsWithin) > maxCrags {
-		crags.CragsWithin = crags.CragsWithin[:maxCrags]
+	// Get top MaxCrags to reduce output for AI
+	if len(crags.CragsWithin) > MaxCrags {
+		crags.CragsWithin = crags.CragsWithin[:MaxCrags]
 	}
 	// Drops the climbs array
 	out := make([]openbeta.CragSummary, 0, len(crags.CragsWithin))
 	for _, a := range crags.CragsWithin {
-		// Skips empty
-		if !hasClimbs(a) {
-			continue
-		}
 		out = append(out, openbeta.CragSummary{
 			UUID:       a.Uuid,
 			Name:       a.AreaName,
@@ -84,7 +92,7 @@ func cragsWithin(ctx context.Context, gql graphql.Client, args CragsWithinArgs) 
 		})
 	}
 
-	return CragsWithinResult{Crags: out, Count: len(out)}, nil
+	return CragsWithinResult{Crags: out, Count: count}, nil
 }
 
 // adapter: MCP signature, no logic
@@ -113,10 +121,6 @@ func ClimbCount(a generated.CragsWithinCragsWithinArea) int {
 		return a.TotalClimbs
 	}
 	return 0
-}
-
-func hasClimbs(a generated.CragsWithinCragsWithinArea) bool {
-	return ClimbCount(a) > 0
 }
 
 // BBox is a geographic bounding box in the order the OpenBeta API expects:

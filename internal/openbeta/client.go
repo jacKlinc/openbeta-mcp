@@ -52,6 +52,7 @@ func (c *Client) HTTPClient() *http.Client { return c.http }
 
 // New returns a Client pointed at the public API unless overridden.
 func New(opts ...Option) *Client {
+	// TODO: add graphql here?
 	c := &Client{
 		endpoint: DefaultEndpoint,
 		http:     &http.Client{Timeout: defaultTimeout},
