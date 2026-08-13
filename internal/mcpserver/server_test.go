@@ -188,7 +188,7 @@ func TestInvalidInputIsAToolError(t *testing.T) {
 		{"bbox too short", "crags_within", map[string]any{"bbox": []float64{1, 2}}, "4 elements"},
 		{"bbox reversed", "crags_within", map[string]any{"bbox": []float64{0, 0, -10, 10}}, "minLng"},
 		{"lat/lng transposed", "crags_within", map[string]any{"bbox": []float64{49.6, -123.2, 49.8, -122.9}}, "latitude out of range"},
-		{"bad uuid", "get_area_details", map[string]any{"areaId": "not-a-uuid"}, "not a valid UUID"},
+		{"bad uuid", "get_area_details", map[string]any{"areaId": "not-a-uuid"}, "invalid UUID length: 10"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
