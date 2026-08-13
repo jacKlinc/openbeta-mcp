@@ -1,24 +1,29 @@
-package openbeta
+package openbeta_test
 
 import (
 	"context"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
+	// "github.com/jacKlinc/openbeta-mcp/internal/openbeta/tools"
 )
+
+const leafZoomThreshold = 11
 
 // Live tests hit the real API. Opt in with OPENBETA_LIVE=1 so the default
 // `go test ./...` stays offline and deterministic.
 //
 //	OPENBETA_LIVE=1 go test ./internal/openbeta -run Live -v
-func liveClient(t *testing.T) (*Client, context.Context) {
+func liveClient(t *testing.T) (*openbeta.Client, context.Context) {
 	t.Helper()
 	if os.Getenv("OPENBETA_LIVE") == "" {
 		t.Skip("set OPENBETA_LIVE=1 to run tests against the live API")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	t.Cleanup(cancel)
-	return New(), ctx
+	return openbeta.New(), ctx
 }
 
 // stawamusChief is a stable, well-populated area used as the verification
@@ -26,7 +31,7 @@ func liveClient(t *testing.T) (*Client, context.Context) {
 const stawamusChief = "8f267065-fc1a-59ce-bcf1-6e9335548363"
 
 // squamishBBox is the box the schema findings were measured against.
-var squamishBBox = BBox{-123.2, 49.6, -122.9, 49.8}
+var squamishBBox = openbeta.BBox{-123.2, 49.6, -122.9, 49.8}
 
 func TestLiveCragsWithin(t *testing.T) {
 	c, ctx := liveClient(t)
@@ -63,7 +68,7 @@ func TestLiveCragsWithinKeepsZeroTotalClimbsCrags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CragsWithin: %v", err)
 	}
-	byName := make(map[string]CragSummary, len(got))
+	byName := make(map[string]openbeta.CragSummary, len(got))
 	for _, cr := range got {
 		byName[cr.Name] = cr
 	}
@@ -177,7 +182,7 @@ func TestLiveGetAreaNotFound(t *testing.T) {
 func TestLiveEmptyBBox(t *testing.T) {
 	c, ctx := liveClient(t)
 
-	got, err := c.CragsWithin(ctx, BBox{-140, -50, -139, -49}, 13)
+	got, err := c.CragsWithin(ctx, openbeta.BBox{-140, -50, -139, -49}, 13)
 	if err != nil {
 		t.Fatalf("expected empty result, got error: %v", err)
 	}
