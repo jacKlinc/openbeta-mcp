@@ -1,0 +1,17 @@
+query CragsWithin($filter: SearchWithinFilter) {
+  cragsWithin(filter: $filter) {
+    uuid
+    areaName
+    totalClimbs
+    pathTokens
+    metadata {
+      lat
+      lng
+      leaf
+      isBoulder
+    }
+    climbs { 
+      uuid 
+    }
+  }
+}

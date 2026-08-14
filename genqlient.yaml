@@ -1,0 +1,9 @@
+schema:
+  - schema/openbeta.graphql
+
+operations:
+  - internal/openbeta/queries/*.graphql
+
+generated: internal/openbeta/generated/generated.go
+
+package: generated

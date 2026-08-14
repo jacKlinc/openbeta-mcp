@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug live tests (all)",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}/internal/openbeta",
+      "args": ["-test.run", "Live", "-test.v"],
+      "env": { "OPENBETA_LIVE": "1" }
+    }
+  ]
+}

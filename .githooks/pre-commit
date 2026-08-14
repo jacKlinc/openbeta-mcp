@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Regenerate the genqlient client and refuse the commit if the result differs
+# from what is checked in. Same check CI runs, moved earlier — CI is still the
+# real gate, since hooks are opt-in and --no-verify skips them.
+#
+# Enable with: git config core.hooksPath .githooks
+set -euo pipefail
+
+go generate ./... >/dev/null
+
+# Fixes all files in dir that need a format
+gofmt -w .
+# Recursively vets all code in dir for dodgy structs
+go vet ./...
+# Recursively compiles all code in dir 	
+go build ./...
+# Recursively runs tests in all code in dir 	
+go test ./...
+
+
+if ! git diff --quiet -- internal/openbeta/generated/; then
+	echo "pre-commit: generated client is out of date."
+	echo "Regenerated files:"
+	git diff --name-only -- internal/openbeta/generated/ | sed 's/^/  /'
+	echo "They have been updated in your working tree — stage them and commit again."
+	exit 1
+fi

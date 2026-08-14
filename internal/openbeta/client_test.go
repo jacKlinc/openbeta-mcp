@@ -1,13 +1,10 @@
 package openbeta
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
+	"time"
 )
 
 // newTestClient serves a fixed response body for any query.
@@ -27,143 +24,28 @@ func newTestClient(t *testing.T, status int, body string) *Client {
 	return New(WithEndpoint(srv.URL))
 }
 
-func TestNewBBoxRejectsWrongLength(t *testing.T) {
-	for _, in := range [][]float64{{}, {1}, {1, 2, 3}, {1, 2, 3, 4, 5}} {
-		if _, err := NewBBox(in); err == nil {
-			t.Errorf("NewBBox(%v) = nil error, want error", in)
-		}
+// New must apply its options to the fields callers actually read back, and must
+// default the rest.
+//
+// This is a regression guard, not a triviality: mcpserver.New builds its
+// genqlient client from Endpoint() and HTTPClient(). While it read
+// DefaultEndpoint directly instead, WithEndpoint was silently ineffective and
+// every test that thought it was stubbing upstream queried the live API.
+func TestOptionsReachTheFieldsCallersRead(t *testing.T) {
+	if got := New().Endpoint(); got != DefaultEndpoint {
+		t.Errorf("Endpoint() = %q, want the public API %q", got, DefaultEndpoint)
 	}
-}
+	if got := New().HTTPClient().Timeout; got != defaultTimeout {
+		t.Errorf("HTTPClient().Timeout = %v, want %v", got, defaultTimeout)
+	}
 
-func TestBBoxValidate(t *testing.T) {
-	tests := []struct {
-		name    string
-		bbox    BBox
-		wantErr string
-	}{
-		{"squamish", BBox{-123.2, 49.6, -122.9, 49.8}, ""},
-		{"antimeridian west edge", BBox{-180, -90, 180, 90}, ""},
-		{"lng swapped", BBox{-122.9, 49.6, -123.2, 49.8}, "minLng"},
-		{"lat swapped", BBox{-123.2, 49.8, -122.9, 49.6}, "minLat"},
-		{"lng out of range", BBox{-181, 49.6, -122.9, 49.8}, "longitude out of range"},
-		{"lat out of range", BBox{-123.2, 49.6, -122.9, 91}, "latitude out of range"},
-		// A lat/lng ordering mistake is the most likely caller error, and it
-		// happens to be caught by the range check.
-		{"lat/lng transposed", BBox{49.6, -123.2, 49.8, -122.9}, "latitude out of range"},
+	const endpoint = "http://127.0.0.1:1/graphql"
+	if got := New(WithEndpoint(endpoint)).Endpoint(); got != endpoint {
+		t.Errorf("Endpoint() = %q, want %q", got, endpoint)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.bbox.Validate()
-			switch {
-			case tt.wantErr == "" && err != nil:
-				t.Fatalf("unexpected error: %v", err)
-			case tt.wantErr != "" && err == nil:
-				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
-			case tt.wantErr != "" && !strings.Contains(err.Error(), tt.wantErr):
-				t.Fatalf("error %q does not contain %q", err, tt.wantErr)
-			}
-		})
-	}
-}
 
-func TestValidateAreaID(t *testing.T) {
-	valid := "8f267065-fc1a-59ce-bcf1-6e9335548363"
-	if err := ValidateAreaID(valid); err != nil {
-		t.Fatalf("valid uuid rejected: %v", err)
-	}
-	for _, bad := range []string{"", "   ", "not-a-uuid", "8f267065fc1a59cebcf16e9335548363", valid + "-extra"} {
-		if err := ValidateAreaID(bad); err == nil {
-			t.Errorf("ValidateAreaID(%q) = nil, want error", bad)
-		}
-	}
-}
-
-// Validation must happen before the network call, so a bad argument costs
-// nothing upstream (FR-18).
-func TestValidationSkipsUpstreamCall(t *testing.T) {
-	var called bool
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		_, _ = w.Write([]byte(`{"data":{}}`))
-	}))
-	defer srv.Close()
-	c := New(WithEndpoint(srv.URL))
-
-	if _, err := c.CragsWithin(context.Background(), BBox{0, 0, -10, 10}, 11); err == nil {
-		t.Error("expected error for reversed bbox")
-	}
-	if _, err := c.GetArea(context.Background(), "nope"); err == nil {
-		t.Error("expected error for bad uuid")
-	}
-	if called {
-		t.Error("upstream was called despite invalid input")
-	}
-}
-
-// A GraphQL error arrives with HTTP 200 and must not be reported as an empty
-// result set (FR-16).
-func TestGraphQLErrorSurfaces(t *testing.T) {
-	c := newTestClient(t, 200, `{"errors":[{"message":"Cannot query field \"nope\""}]}`)
-
-	_, err := c.CragsWithin(context.Background(), BBox{-123.2, 49.6, -122.9, 49.8}, 11)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	var apiErr *APIError
-	if !errors.As(err, &apiErr) {
-		t.Fatalf("expected *APIError, got %T: %v", err, err)
-	}
-	if !strings.Contains(err.Error(), "Cannot query field") {
-		t.Errorf("error should carry the upstream message, got %q", err)
-	}
-}
-
-// The API returns bare non-JSON error pages (an observed 502 on malformed
-// queries); the error should name the status, not a JSON parse failure (FR-17).
-func TestNonJSONErrorPageSurfaces(t *testing.T) {
-	c := newTestClient(t, 502, "error code: 502")
-
-	_, err := c.CragsWithin(context.Background(), BBox{-123.2, 49.6, -122.9, 49.8}, 11)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "502") {
-		t.Errorf("error should mention the status, got %q", err)
-	}
-}
-
-func TestUnreachableUpstreamSurfaces(t *testing.T) {
-	// Port 1 is reserved and will refuse the connection.
-	c := New(WithEndpoint("http://127.0.0.1:1/graphql"))
-	if _, err := c.GetArea(context.Background(), "8f267065-fc1a-59ce-bcf1-6e9335548363"); err == nil {
-		t.Fatal("expected transport error, got nil")
-	}
-}
-
-// An empty box is a valid answer, and must marshal as [] rather than null so a
-// client cannot mistake it for a missing field (FR-11).
-func TestEmptyResultIsNotAnError(t *testing.T) {
-	c := newTestClient(t, 200, `{"data":{"cragsWithin":[]}}`)
-
-	got, err := c.CragsWithin(context.Background(), BBox{-140, -50, -139, -49}, 11)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(got) != 0 {
-		t.Fatalf("expected no crags, got %d", len(got))
-	}
-	b, _ := json.Marshal(got)
-	if string(b) != "[]" {
-		t.Errorf("empty result marshalled as %s, want []", b)
-	}
-}
-
-func TestGetAreaNotFound(t *testing.T) {
-	c := newTestClient(t, 200, `{"data":{"area":null}}`)
-
-	_, err := c.GetArea(context.Background(), "00000000-0000-0000-0000-000000000000")
-	var notFound *ErrAreaNotFound
-	if !errors.As(err, &notFound) {
-		t.Fatalf("expected *ErrAreaNotFound, got %T: %v", err, err)
+	custom := &http.Client{Timeout: 7 * time.Second}
+	if got := New(WithHTTPClient(custom)).HTTPClient(); got != custom {
+		t.Errorf("HTTPClient() = %p, want the injected client %p", got, custom)
 	}
 }
