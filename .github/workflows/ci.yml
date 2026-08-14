@@ -59,12 +59,21 @@ jobs:
 
   # The live API is a free public service run by volunteers. Hitting it on every
   # push would be rude and would make CI fail for reasons unrelated to the code,
-  # so these run nightly and on demand — they exist to catch upstream schema
-  # drift, not to gate merges.
+  # so these run on pull requests, nightly and on demand — never on plain pushes.
+  # They exist to catch upstream schema drift, and continue-on-error keeps an
+  # upstream outage from blocking a merge.
   live:
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     continue-on-error: true
+    # A PR gets a run per push to its branch; this stops several from piling onto
+    # the upstream API at once.
+    concurrency:
+      group: live-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
 
