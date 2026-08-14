@@ -74,41 +74,12 @@ func cragsNear(ctx context.Context, gql graphql.Client, resolver geo.Resolver, a
 		return CragsNearResult{}, err
 	}
 
-	km := float64(defaultMaxDistanceKm)
-	if args.MaxDistanceKm != nil {
-		km = *args.MaxDistanceKm
-	}
-	if km <= 0 || km > maxDistanceLimitKm {
-		return CragsNearResult{}, fmt.Errorf("maxDistanceKm must be greater than 0 and at most %d, got %g", maxDistanceLimitKm, km)
-	}
-
 	point := geo.Point{Lat: origin.Lat, Lng: origin.Lng}
-	// Upstream takes metres, and the tool takes kilometres because that is what
-	// a caller thinks in. This is the only conversion: passing 5 rather than
-	// 5000 searches a five-metre radius and returns nothing, which reads as
-	// "no crags here".
-	metres := int(km * 1000)
-
-	resp, err := generated.CragsNear(ctx, gql, generated.Point{Lat: point.Lat, Lng: point.Lng}, metres)
+	// Nearest first, capped. Ranking by climb count is not possible here —
+	// cragsNear returns no climbs, which is what the fan-out below is for.
+	found, err := nearestCrags(ctx, gql, point, args.MaxDistanceKm)
 	if err != nil {
 		return CragsNearResult{}, err
-	}
-
-	// The resolver returns one group per placeId; flatten it.
-	var found []CragsNearCrag
-	for _, group := range resp.CragsNear {
-		for _, a := range group.Crags {
-			found = append(found, a)
-		}
-	}
-
-	// Nearest first, then cap. Ranking by climb count is not possible yet —
-	// cragsNear returns no climbs, which is what the fan-out below is for.
-	slices.SortFunc(found, func(a, b CragsNearCrag) int {
-		return cmp.Compare(distanceKm(point, a), distanceKm(point, b))
-	})
-	if len(found) > MaxCrags {
-		found = found[:MaxCrags]
 	}
 
 	crags, err := withClimbCounts(ctx, gql, point, found)

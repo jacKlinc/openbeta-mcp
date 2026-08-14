@@ -78,8 +78,8 @@ func TestListTools(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTools: %v", err)
 	}
-	if len(res.Tools) != 2 {
-		t.Fatalf("expected 2 tools, got %d", len(res.Tools))
+	if len(res.Tools) != 3 {
+		t.Fatalf("expected 3 tools, got %d", len(res.Tools))
 	}
 
 	byName := make(map[string]*mcp.Tool, len(res.Tools))
@@ -92,7 +92,7 @@ func TestListTools(t *testing.T) {
 			t.Errorf("%s has no input schema", tool.Name)
 		}
 	}
-	for _, name := range []string{"crags_near", "get_area_details"} {
+	for _, name := range []string{"crags_near", "find_climbs", "get_area_details"} {
 		if _, ok := byName[name]; !ok {
 			t.Errorf("tool %q not registered", name)
 		}
@@ -154,6 +154,7 @@ func TestInvalidInputIsAToolError(t *testing.T) {
 		{"lnglat wrong length", "crags_near", map[string]any{"lnglat": []float64{1}}, "exactly 2 elements"},
 		{"lat/lng transposed", "crags_near", map[string]any{"lnglat": []float64{49.7, -123.2}}, "latitude out of range"},
 		{"unknown place", "crags_near", map[string]any{"place": "Nowhere At All"}, "no coordinates known"},
+		{"non-YDS grade", "find_climbs", map[string]any{"place": "Squamish", "minGrade": "V4"}, "YDS"},
 		{"bad uuid", "get_area_details", map[string]any{"areaId": "not-a-uuid"}, "invalid UUID length: 10"},
 	}
 	for _, tt := range tests {

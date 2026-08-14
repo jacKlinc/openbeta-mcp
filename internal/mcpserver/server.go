@@ -42,6 +42,20 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 	}, tools.HandleCragsNear(&gqlClient, geo.NewGazetteer()))
 
 	mcp.AddTool(server, &mcp.Tool{
+		Name: "find_climbs",
+		Description: "Find individual trad routes near a place, filtered by YDS grade and by " +
+			"whether they are multi-pitch. Takes the same 'place' or 'lnglat' origin as " +
+			"crags_near. minGrade and maxGrade are inclusive at the edges, so a route " +
+			"recorded imprecisely as '5.10' is returned for a 5.8 to 5.10b search. " +
+			"Currently trad only, and YDS only — sport routes and boulder problems are " +
+			"not returned. " +
+			"The API stores no pitch count, so 'multipitch' is inferred from route length: " +
+			"'unknown' means the length was never recorded, not that the route is single " +
+			"pitch. 'cragsScanned' tells you how many crags were searched, so no results " +
+			"with a non-zero scan means the area genuinely holds nothing matching.",
+	}, tools.HandleFindClimbs(&gqlClient, geo.NewGazetteer()))
+
+	mcp.AddTool(server, &mcp.Tool{
 		Name: "get_area_details",
 		Description: "Get detail for one climbing area by UUID: name, coordinates, description, " +
 			"and either its routes or its sub-areas. " +
