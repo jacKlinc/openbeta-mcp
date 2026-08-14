@@ -35,7 +35,7 @@ func liveClient(t *testing.T) (*openbeta.Client, context.Context, *graphql.Clien
 const stawamusChief = "8f267065-fc1a-59ce-bcf1-6e9335548363"
 
 // squamishBBox is the box the schema findings were measured against.
-var squamishBBox = openbeta.BBox{-123.2, 49.6, -122.9, 49.8}
+var squamishBBox = tools.BBox{-123.2, 49.6, -122.9, 49.8}
 
 const leafZoomThreshold = 11
 

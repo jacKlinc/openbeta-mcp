@@ -1,21 +1,5 @@
 package openbeta
 
-// Wire types: these mirror the OpenBeta GraphQL schema and exist only to decode
-// responses. They are deliberately kept separate from the summary types returned
-// to MCP clients (NFR-10) so an upstream schema change cannot silently reshape
-// tool output.
-
-type areaMetadata struct {
-	Lat       float64 `json:"lat"`
-	Lng       float64 `json:"lng"`
-	Leaf      bool    `json:"leaf"`
-	IsBoulder bool    `json:"isBoulder"`
-}
-
-type areaContent struct {
-	Description string `json:"description"`
-}
-
 type climbType struct {
 	Sport         bool `json:"sport"`
 	Trad          bool `json:"trad"`
@@ -86,32 +70,6 @@ func (g gradeType) preferred(isBoulder bool) string {
 		}
 	}
 	return ""
-}
-
-type climb struct {
-	UUID   string    `json:"uuid"`
-	Name   string    `json:"name"`
-	FA     string    `json:"fa"`
-	Length int       `json:"length"`
-	Safety string    `json:"safety"`
-	Type   climbType `json:"type"`
-	Grades gradeType `json:"grades"`
-}
-
-type area struct {
-	UUID         string       `json:"uuid"`
-	AreaName     string       `json:"areaName"`
-	TotalClimbs  int          `json:"totalClimbs"`
-	GradeContext string       `json:"gradeContext"`
-	PathTokens   []string     `json:"pathTokens"`
-	Metadata     areaMetadata `json:"metadata"`
-	Content      areaContent  `json:"content"`
-	Children     []area       `json:"children"`
-	Climbs       []climb      `json:"climbs"`
-}
-
-type cragsWithinData struct {
-	CragsWithin []area `json:"cragsWithin"`
 }
 
 // Output types: what MCP clients actually receive. Trimmed for token economy and
