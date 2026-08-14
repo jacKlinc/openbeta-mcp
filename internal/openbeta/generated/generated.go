@@ -8,6 +8,55 @@ import (
 	"github.com/Khan/genqlient/graphql"
 )
 
+// CragsNearCragsNear includes the requested fields of the GraphQL type CragsNear.
+type CragsNearCragsNear struct {
+	Id      string                        `json:"_id"`
+	PlaceId string                        `json:"placeId"`
+	Count   int                           `json:"count"`
+	Crags   []CragsNearCragsNearCragsArea `json:"crags"`
+}
+
+// GetId returns CragsNearCragsNear.Id, and is useful for accessing the field via an interface.
+func (v *CragsNearCragsNear) GetId() string { return v.Id }
+
+// GetPlaceId returns CragsNearCragsNear.PlaceId, and is useful for accessing the field via an interface.
+func (v *CragsNearCragsNear) GetPlaceId() string { return v.PlaceId }
+
+// GetCount returns CragsNearCragsNear.Count, and is useful for accessing the field via an interface.
+func (v *CragsNearCragsNear) GetCount() int { return v.Count }
+
+// GetCrags returns CragsNearCragsNear.Crags, and is useful for accessing the field via an interface.
+func (v *CragsNearCragsNear) GetCrags() []CragsNearCragsNearCragsArea { return v.Crags }
+
+// CragsNearCragsNearCragsArea includes the requested fields of the GraphQL type Area.
+// The GraphQL type's documentation follows.
+//
+// A climbing area, wall or crag
+type CragsNearCragsNearCragsArea struct {
+	// We use UUID for identification of areas. The id field is used in internal database relations.
+	Uuid     string `json:"uuid"`
+	AreaName string `json:"areaName"`
+	// The total number of climbs in this area
+	TotalClimbs int `json:"totalClimbs"`
+}
+
+// GetUuid returns CragsNearCragsNearCragsArea.Uuid, and is useful for accessing the field via an interface.
+func (v *CragsNearCragsNearCragsArea) GetUuid() string { return v.Uuid }
+
+// GetAreaName returns CragsNearCragsNearCragsArea.AreaName, and is useful for accessing the field via an interface.
+func (v *CragsNearCragsNearCragsArea) GetAreaName() string { return v.AreaName }
+
+// GetTotalClimbs returns CragsNearCragsNearCragsArea.TotalClimbs, and is useful for accessing the field via an interface.
+func (v *CragsNearCragsNearCragsArea) GetTotalClimbs() int { return v.TotalClimbs }
+
+// CragsNearResponse is returned by CragsNear on success.
+type CragsNearResponse struct {
+	CragsNear []CragsNearCragsNear `json:"cragsNear"`
+}
+
+// GetCragsNear returns CragsNearResponse.CragsNear, and is useful for accessing the field via an interface.
+func (v *CragsNearResponse) GetCragsNear() []CragsNearCragsNear { return v.CragsNear }
+
 // CragsWithinCragsWithinArea includes the requested fields of the GraphQL type Area.
 // The GraphQL type's documentation follows.
 //
@@ -405,6 +454,17 @@ type GetAreaDetailsResponse struct {
 // GetArea returns GetAreaDetailsResponse.Area, and is useful for accessing the field via an interface.
 func (v *GetAreaDetailsResponse) GetArea() GetAreaDetailsArea { return v.Area }
 
+type Point struct {
+	Lat float64 `json:"lat"`
+	Lng float64 `json:"lng"`
+}
+
+// GetLat returns Point.Lat, and is useful for accessing the field via an interface.
+func (v *Point) GetLat() float64 { return v.Lat }
+
+// GetLng returns Point.Lng, and is useful for accessing the field via an interface.
+func (v *Point) GetLng() float64 { return v.Lng }
+
 // rating indicates the quality and spacing of a route's available protection for a
 // competent climber. Amusingly, the letter codes associated with the different
 // protection ratings are based on the American system for movie ratings:
@@ -450,6 +510,26 @@ func (v *SearchWithinFilter) GetBbox() []float64 { return v.Bbox }
 // GetZoom returns SearchWithinFilter.Zoom, and is useful for accessing the field via an interface.
 func (v *SearchWithinFilter) GetZoom() float64 { return v.Zoom }
 
+// __CragsNearInput is used internally by genqlient
+type __CragsNearInput struct {
+	PlaceId      string `json:"placeId"`
+	Lnglat       Point  `json:"lnglat"`
+	MaxDistance  int    `json:"maxDistance"`
+	IncludeCrags bool   `json:"includeCrags"`
+}
+
+// GetPlaceId returns __CragsNearInput.PlaceId, and is useful for accessing the field via an interface.
+func (v *__CragsNearInput) GetPlaceId() string { return v.PlaceId }
+
+// GetLnglat returns __CragsNearInput.Lnglat, and is useful for accessing the field via an interface.
+func (v *__CragsNearInput) GetLnglat() Point { return v.Lnglat }
+
+// GetMaxDistance returns __CragsNearInput.MaxDistance, and is useful for accessing the field via an interface.
+func (v *__CragsNearInput) GetMaxDistance() int { return v.MaxDistance }
+
+// GetIncludeCrags returns __CragsNearInput.IncludeCrags, and is useful for accessing the field via an interface.
+func (v *__CragsNearInput) GetIncludeCrags() bool { return v.IncludeCrags }
+
 // __CragsWithinInput is used internally by genqlient
 type __CragsWithinInput struct {
 	Filter SearchWithinFilter `json:"filter"`
@@ -465,6 +545,53 @@ type __GetAreaDetailsInput struct {
 
 // GetUuid returns __GetAreaDetailsInput.Uuid, and is useful for accessing the field via an interface.
 func (v *__GetAreaDetailsInput) GetUuid() string { return v.Uuid }
+
+// The query executed by CragsNear.
+const CragsNear_Operation = `
+query CragsNear ($placeId: String, $lnglat: Point, $maxDistance: Int, $includeCrags: Boolean) {
+	cragsNear(placeId: $placeId, lnglat: $lnglat, maxDistance: $maxDistance, includeCrags: $includeCrags) {
+		_id
+		placeId
+		count
+		crags {
+			uuid
+			areaName
+			totalClimbs
+		}
+	}
+}
+`
+
+func CragsNear(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	placeId string,
+	lnglat Point,
+	maxDistance int,
+	includeCrags bool,
+) (data_ *CragsNearResponse, err_ error) {
+	req_ := &graphql.Request{
+		OpName: "CragsNear",
+		Query:  CragsNear_Operation,
+		Variables: &__CragsNearInput{
+			PlaceId:      placeId,
+			Lnglat:       lnglat,
+			MaxDistance:  maxDistance,
+			IncludeCrags: includeCrags,
+		},
+	}
+
+	data_ = &CragsNearResponse{}
+	resp_ := &graphql.Response{Data: data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return data_, err_
+}
 
 // The query executed by CragsWithin.
 const CragsWithin_Operation = `
