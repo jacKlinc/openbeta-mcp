@@ -161,17 +161,21 @@ func resolveOrigin(ctx context.Context, resolver geo.Resolver, args CragsNearArg
 	}
 }
 
-// withClimbCounts fills in the climb count cragsNear cannot provide, by asking
-// for each area's detail concurrently.
+// fetchAreaDetails asks for each area's detail concurrently, returning a slice
+// positionally matching areas with nil where the call failed.
+//
+// cragsNear returns no climbs at all, so this second round trip is the only way
+// to learn anything about what a crag actually holds — climb counts here, and
+// the climbs themselves for find_climbs.
 //
 // A crag that fails is dropped rather than failing the whole call: upstream
 // returns intermittent 502s, and one of them should degrade a result rather
 // than erase it. If every call fails, that is an outage and the error is
 // returned, because an empty list would read as "nothing here".
-func withClimbCounts(ctx context.Context, gql graphql.Client, origin geo.Point, areas []CragsNearCrag) ([]NearbyCrag, error) {
-	out := make([]NearbyCrag, len(areas))
+func fetchAreaDetails(ctx context.Context, gql graphql.Client, areas []CragsNearCrag) ([]*generated.GetAreaDetailsArea, error) {
 	// Per-index slots rather than shared variables: every goroutine writes only
 	// its own element, so no locking is needed to collect either result.
+	details := make([]*generated.GetAreaDetailsArea, len(areas))
 	errs := make([]error, len(areas))
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -183,26 +187,14 @@ func withClimbCounts(ctx context.Context, gql graphql.Client, origin geo.Point, 
 				errs[i] = err
 				return nil
 			}
-			n := climbCount(detail.Area.TotalClimbs, len(detail.Area.Climbs))
-			if n == 0 {
-				return nil
-			}
-			out[i] = NearbyCrag{
-				UUID:       a.Uuid,
-				Name:       a.AreaName,
-				Lat:        a.Metadata.Lat,
-				Lng:        a.Metadata.Lng,
-				DistanceKm: distanceKm(origin, a),
-				ClimbCount: n,
-				IsBoulder:  a.Metadata.IsBoulder,
-				Path:       a.PathTokens,
-			}
+			details[i] = &detail.Area
 			return nil
 		})
 	}
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
+
 	failed := 0
 	var firstErr error
 	for _, err := range errs {
@@ -216,14 +208,37 @@ func withClimbCounts(ctx context.Context, gql graphql.Client, origin geo.Point, 
 	if len(areas) > 0 && failed == len(areas) {
 		return nil, fmt.Errorf("no crag details could be fetched: %w", firstErr)
 	}
+	return details, nil
+}
+
+// withClimbCounts fills in the climb count cragsNear cannot provide.
+func withClimbCounts(ctx context.Context, gql graphql.Client, origin geo.Point, areas []CragsNearCrag) ([]NearbyCrag, error) {
+	details, err := fetchAreaDetails(ctx, gql, areas)
+	if err != nil {
+		return nil, err
+	}
 
 	// Non-nil so an empty result marshals as [] rather than null. An empty
 	// radius is a valid answer, not an error (FR-11).
-	crags := make([]NearbyCrag, 0, len(out))
-	for _, c := range out {
-		if c.UUID != "" {
-			crags = append(crags, c)
+	crags := make([]NearbyCrag, 0, len(areas))
+	for i, a := range areas {
+		if details[i] == nil {
+			continue
 		}
+		n := climbCount(details[i].TotalClimbs, len(details[i].Climbs))
+		if n == 0 {
+			continue
+		}
+		crags = append(crags, NearbyCrag{
+			UUID:       a.Uuid,
+			Name:       a.AreaName,
+			Lat:        a.Metadata.Lat,
+			Lng:        a.Metadata.Lng,
+			DistanceKm: distanceKm(origin, a),
+			ClimbCount: n,
+			IsBoulder:  a.Metadata.IsBoulder,
+			Path:       a.PathTokens,
+		})
 	}
 	return crags, nil
 }
