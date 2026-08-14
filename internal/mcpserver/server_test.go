@@ -12,7 +12,6 @@ import (
 
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta/generated"
-	"github.com/jacKlinc/openbeta-mcp/internal/tools"
 )
 
 // connect wires a client to a server over the in-memory transport, with the
@@ -73,7 +72,7 @@ func resultText(t *testing.T, res *mcp.CallToolResult) string {
 
 // Exactly two tools, both discoverable with usable schemas (FR-1, FR-4).
 func TestListTools(t *testing.T) {
-	cs := connect(t, `{"data":{"cragsWithin":[]}}`)
+	cs := connect(t, `{"data":{"cragsNear":[]}}`)
 
 	res, err := cs.ListTools(context.Background(), nil)
 	if err != nil {
@@ -93,58 +92,24 @@ func TestListTools(t *testing.T) {
 			t.Errorf("%s has no input schema", tool.Name)
 		}
 	}
-	for _, name := range []string{"crags_within", "get_area_details"} {
+	for _, name := range []string{"crags_near", "get_area_details"} {
 		if _, ok := byName[name]; !ok {
 			t.Errorf("tool %q not registered", name)
 		}
 	}
 
-	// The bbox ordering is the easiest thing for a caller to get wrong, and the
+	// lnglat ordering is the easiest thing for a caller to get wrong, and the
 	// upstream schema won't catch it — so it must be stated where an LLM will
 	// actually read it (NFR-12).
-	schema, err := json.Marshal(byName["crags_within"].InputSchema)
+	schema, err := json.Marshal(byName["crags_near"].InputSchema)
 	if err != nil {
 		t.Fatalf("marshalling schema: %v", err)
 	}
-	if !strings.Contains(string(schema), "minLng") {
-		t.Errorf("crags_within schema does not document bbox ordering: %s", schema)
+	if !strings.Contains(string(schema), "longitude") {
+		t.Errorf("crags_near schema does not document lnglat ordering: %s", schema)
 	}
 }
 
-func TestCragsWithin(t *testing.T) {
-	body := `{"data":{"cragsWithin":[
-		{"uuid":"a","areaName":"Tantalus Wall","totalClimbs":0,"metadata":{"lat":49.68,"lng":-123.14},"climbs":[{"uuid":"c1"},{"uuid":"c2"}]},
-		{"uuid":"b","areaName":"Empty Area","totalClimbs":0,"metadata":{},"climbs":[]}
-	]}}`
-	cs := connect(t, body)
-
-	res := call(t, cs, "crags_within", map[string]any{"bbox": []float64{-123.2, 49.6, -122.9, 49.8}})
-	if res.IsError {
-		t.Fatalf("unexpected tool error: %s", resultText(t, res))
-	}
-
-	var out tools.CragsWithinResult
-	if err := json.Unmarshal([]byte(resultText(t, res)), &out); err != nil {
-		t.Fatalf("decoding result: %v (raw: %s)", err, resultText(t, res))
-	}
-	if out.Count != 1 || len(out.Crags) != 1 {
-		t.Fatalf("expected 1 crag (empty one dropped), got %d: %+v", out.Count, out.Crags)
-	}
-	if out.Crags[0].Name != "Tantalus Wall" || out.Crags[0].ClimbCount != 2 {
-		t.Errorf("unexpected crag: %+v", out.Crags[0])
-	}
-}
-
-// zoom is optional and must default to the leaf level, or a caller that omits it
-// silently gets parent regions instead of crags.
-func TestZoomIsOptional(t *testing.T) {
-	cs := connect(t, `{"data":{"cragsWithin":[]}}`)
-
-	res := call(t, cs, "crags_within", map[string]any{"bbox": []float64{-123.2, 49.6, -122.9, 49.8}})
-	if res.IsError {
-		t.Fatalf("omitting zoom should be valid, got: %s", resultText(t, res))
-	}
-}
 func TestGetAreaDetails(t *testing.T) {
 	body := `{"data":{"area":{
 		"uuid":"8f267065-fc1a-59ce-bcf1-6e9335548363","areaName":"Stawamus Chief","totalClimbs":369,
@@ -177,7 +142,7 @@ func TestGetAreaDetails(t *testing.T) {
 // Bad input must come back as a tool error the model can read and correct, not
 // as a protocol error that kills the call (FR-18).
 func TestInvalidInputIsAToolError(t *testing.T) {
-	cs := connect(t, `{"data":{"cragsWithin":[]}}`)
+	cs := connect(t, `{"data":{"cragsNear":[]}}`)
 
 	tests := []struct {
 		name string
@@ -185,9 +150,10 @@ func TestInvalidInputIsAToolError(t *testing.T) {
 		args map[string]any
 		want string
 	}{
-		{"bbox too short", "crags_within", map[string]any{"bbox": []float64{1, 2}}, "4 elements"},
-		{"bbox reversed", "crags_within", map[string]any{"bbox": []float64{0, 0, -10, 10}}, "minLng"},
-		{"lat/lng transposed", "crags_within", map[string]any{"bbox": []float64{49.6, -123.2, 49.8, -122.9}}, "latitude out of range"},
+		{"no origin", "crags_near", map[string]any{}, "pass a place name"},
+		{"lnglat wrong length", "crags_near", map[string]any{"lnglat": []float64{1}}, "exactly 2 elements"},
+		{"lat/lng transposed", "crags_near", map[string]any{"lnglat": []float64{49.7, -123.2}}, "latitude out of range"},
+		{"unknown place", "crags_near", map[string]any{"place": "Nowhere At All"}, "no coordinates known"},
 		{"bad uuid", "get_area_details", map[string]any{"areaId": "not-a-uuid"}, "invalid UUID length: 10"},
 	}
 	for _, tt := range tests {
@@ -208,7 +174,7 @@ func TestInvalidInputIsAToolError(t *testing.T) {
 func TestUpstreamErrorIsAToolError(t *testing.T) {
 	cs := connect(t, `{"errors":[{"message":"Cannot query field \"nope\""}]}`)
 
-	res := call(t, cs, "crags_within", map[string]any{"bbox": []float64{-123.2, 49.6, -122.9, 49.8}})
+	res := call(t, cs, "crags_near", map[string]any{"place": "Squamish"})
 	if !res.IsError {
 		t.Fatalf("expected a tool error, got success: %s", resultText(t, res))
 	}

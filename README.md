@@ -54,22 +54,30 @@ claude mcp remove openbeta  # undo
 `/mcp` inside a session shows the same status plus the tool list.
 
 Then ask for something that needs it — *"what can I climb near Squamish?"* — and Claude Code should
-call `crags_within`.
+call `crags_near`.
 
 
 ## Tools
 
-**`crags_within(bbox, zoom)`** — crags inside a bounding box, largest first.
+**`crags_near(place | lnglat, maxDistanceKm)`** — crags near a point, most climbs first.
 
-`bbox` is `[minLng, minLat, maxLng, maxLat]` — **longitude first**. `zoom` is optional and selects
-the level of the area hierarchy: 11 or above returns individual crags, below that returns parent
-regions. It defaults to 13.
+`place` is a well-known climbing destination or town, resolved from a table compiled into the
+binary. Anything it does not hold returns an error saying so, and `lnglat` — `[longitude, latitude]`,
+**longitude first** — is the escape hatch. `maxDistanceKm` defaults to 20.
+
+Only crags that actually hold climbs come back, at most 20 of them, and each carries its distance
+from the origin. `origin` reports what the search resolved to, so a wrong coordinate is visible
+rather than silently shifting the answer.
+
+Filling in climb counts costs one extra request per crag: the upstream `cragsNear` resolver returns
+areas with an empty `climbs` list, so the count comes from a follow-up call. See
+[docs/graphql-findings.md](docs/graphql-findings.md) §4.
 
 **`get_area_details(areaId)`** — name, coordinates, description, routes and sub-areas for one area.
 
 Areas hold either routes or sub-areas, never both. A large area returns its children; descend
 through them to reach the routes. `areaId` must be a canonical 8-4-4-4-12 UUID, which is what
-`crags_within` hands back.
+`crags_near` hands back.
 
 [docs/examples/squamish.md](docs/examples/squamish.md) shows both tools answering a real question
 against the live API.
@@ -102,18 +110,20 @@ npx get-graphql-schema https://api.openbeta.io > schema/openbeta.graphql
 ```
 
 Write one operation per named block; the operation name becomes the generated function name, so
-`query CragsWithin` in [queries/cragsWithin.graphql](internal/openbeta/queries/cragsWithin.graphql)
-produces `generated.CragsWithin`:
+`query CragsNear` in [queries/cragsNear.graphql](internal/openbeta/queries/cragsNear.graphql)
+produces `generated.CragsNear`:
 
 ```graphql
-query CragsWithin($filter: SearchWithinFilter) {
-  cragsWithin(filter: $filter) {
-    uuid
-    areaName
-    totalClimbs
-    pathTokens
-    metadata { lat lng leaf isBoulder }
-    climbs { uuid }
+query CragsNear($lnglat: Point, $maxDistance: Int) {
+  cragsNear(lnglat: $lnglat, maxDistance: $maxDistance, includeCrags: true) {
+    count
+    crags {
+      uuid
+      areaName
+      totalClimbs
+      pathTokens
+      metadata { lat lng leaf isBoulder }
+    }
   }
 }
 ```
@@ -154,6 +164,7 @@ the new schema and run `go generate ./...`.
 ```
 cmd/openbeta-mcp/            binary: flags, stdio transport, shutdown
 internal/mcpserver/          MCP tool registration and descriptions
+internal/geo/                place-name gazetteer and distance
 internal/tools/              tool handlers, arguments and output types
 internal/openbeta/           endpoint and HTTP client configuration
 internal/openbeta/queries/   .graphql operations, input to genqlient
@@ -176,7 +187,8 @@ transport later is a change at the composition root rather than a fork of the ha
   is surprising
 - [genqlient migration notes](docs/genqclient/migration-notes.md) — open items in the switch from
   the hand-written client to the generated one
-- [genqlient plan](docs/genqclient/plan.md) — design rationale for that switch
+- [cragsNear notes](docs/cragsNear/README.md) — why the proximity query needs a second call, and
+  the shape that follows
 - [Retry policy](docs/retry.md) — design note on handling upstream 5xx, not yet implemented
 - [Worked example](docs/examples/squamish.md) — both tools against the live API
 - [Functional requirements](docs/poc/functional-requirements.md) — what the server does

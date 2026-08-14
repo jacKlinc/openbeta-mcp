@@ -8,6 +8,7 @@ import (
 
 	"github.com/Khan/genqlient/graphql"
 
+	"github.com/jacKlinc/openbeta-mcp/internal/geo"
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
 	"github.com/jacKlinc/openbeta-mcp/internal/tools"
 )
@@ -32,100 +33,6 @@ func liveClient(t *testing.T) (*openbeta.Client, context.Context, *graphql.Clien
 // stawamusChief is a stable, well-populated area used as the verification
 // vehicle throughout.
 const stawamusChief = "8f267065-fc1a-59ce-bcf1-6e9335548363"
-
-// squamishBBox is the box the schema findings were measured against.
-var squamishBBox = tools.BBox{-123.2, 49.6, -122.9, 49.8}
-
-const leafZoomThreshold = 11
-
-func callHandler(ctx context.Context, gql *graphql.Client, bbox tools.BBox) (any, tools.CragsWithinResult, error) {
-	var zoom float64 = 13.0
-	h := tools.HandleCragsWithin(gql)
-	return h(ctx, nil, tools.CragsWithinArgs{BBox: bbox[:], Zoom: &zoom})
-}
-
-func TestLiveCragsWithin(t *testing.T) {
-	_, ctx, gql := liveClient(t)
-
-	_, got, err := callHandler(ctx, gql, tools.BBox(squamishBBox))
-	if err != nil {
-		t.Fatalf("CragsWithin: %v", err)
-	}
-	// Count is the number of crags in the box, not the number returned, so it
-	// still measures the live result rather than the truncation.
-	if got.Count < 100 {
-		t.Errorf("expected >100 crags in Squamish at zoom 13, got %d", got.Count)
-	}
-	if len(got.Crags) != tools.MaxCrags {
-		t.Errorf("expected a full page of %d crags, got %d", tools.MaxCrags, len(got.Crags))
-	}
-	for _, cr := range got.Crags {
-		if cr.ClimbCount == 0 {
-			t.Errorf("%q returned with zero climbs", cr.Name)
-		}
-		if cr.UUID == "" || cr.Name == "" {
-			t.Errorf("crag missing identity: %+v", cr)
-		}
-		if cr.Lat < 49.5 || cr.Lat > 49.9 || cr.Lng < -123.3 || cr.Lng > -122.8 {
-			t.Errorf("%q at (%g, %g) is outside the requested bbox", cr.Name, cr.Lat, cr.Lng)
-		}
-	}
-	if got.Crags[0].ClimbCount < got.Crags[len(got.Crags)-1].ClimbCount {
-		t.Error("results are not sorted by climb count")
-	}
-}
-
-// The regression that motivates climbCount: these crags report totalClimbs 0
-// upstream while holding real climbs, and must not be filtered out.
-func TestLiveCragsWithinKeepsZeroTotalClimbsCrags(t *testing.T) {
-	_, ctx, gql := liveClient(t)
-	_, got, err := callHandler(ctx, gql, tools.BBox(squamishBBox))
-	if err != nil {
-		t.Fatalf("CragsWithin: %v", err)
-	}
-	byName := make(map[string]tools.CragSummary, len(got.Crags))
-	for _, cr := range got.Crags {
-		byName[cr.Name] = cr
-	}
-	for _, name := range []string{"The Apron", "Slhanay", "Parking Lot Wall"} {
-		cr, ok := byName[name]
-		if !ok {
-			t.Errorf("%q missing from results (upstream totalClimbs is 0, but it has climbs)", name)
-			continue
-		}
-		if cr.ClimbCount == 0 {
-			t.Errorf("%q has ClimbCount 0", name)
-		}
-	}
-}
-
-// TODO: this needs to be changed to cragsNear to prevent overloading the API
-// Low zoom returns parent areas, high zoom returns individual crags. Both must
-// come back populated.
-func TestLiveZoomThreshold(t *testing.T) {
-	_, ctx, gql := liveClient(t)
-	h := tools.HandleCragsWithin(gql)
-
-	var zoom float64 = 10.0
-	_, parents, err := h(ctx, nil, tools.CragsWithinArgs{BBox: squamishBBox[:], Zoom: &zoom})
-	if err != nil {
-		t.Fatalf("CragsWithin at low zoom: %v", err)
-	}
-	// Zoom in and run again
-	zoom += 1
-	_, leaves, err := h(ctx, nil, tools.CragsWithinArgs{BBox: squamishBBox[:], Zoom: &zoom})
-	if err != nil {
-		t.Fatalf("CragsWithin at leaf zoom: %v", err)
-	}
-
-	if parents.Count == 0 || leaves.Count == 0 {
-		t.Fatalf("expected results at both zooms, got %d parents and %d leaves", parents.Count, leaves.Count)
-	}
-	if leaves.Count <= parents.Count {
-		t.Errorf("expected more results at zoom %d (%d) than below it (%d)",
-			leafZoomThreshold, leaves.Count, parents.Count)
-	}
-}
 
 func TestLiveGetAreaParent(t *testing.T) {
 	_, ctx, gql := liveClient(t)
@@ -201,10 +108,51 @@ func TestLiveGetAreaNotFound(t *testing.T) {
 	}
 }
 
-// An ocean bbox is a legitimately empty answer, not a failure.
-func TestLiveEmptyBBox(t *testing.T) {
+// crags_near end to end: resolve a place, search by radius, fan out for climb
+// counts.
+//
+// The climb counts are the assertion that matters. cragsNear itself returns no
+// climbs at all (docs/graphql-findings.md §4), so a non-zero count can only come
+// from the fan-out. It also pins the unit conversion: maxDistance is metres
+// upstream, so a 5 km search that forgot to multiply would ask for 5 metres and
+// return nothing.
+func TestLiveCragsNear(t *testing.T) {
 	_, ctx, gql := liveClient(t)
-	_, got, err := callHandler(ctx, gql, tools.BBox{-140, -50, -139, -49})
+	h := tools.HandleCragsNear(gql, geo.NewGazetteer())
+
+	radiusKm := 5.0
+	_, got, err := h(ctx, nil, tools.CragsNearArgs{Place: "Squamish", MaxDistanceKm: &radiusKm})
+	if err != nil {
+		t.Fatalf("CragsNear: %v", err)
+	}
+	if len(got.Crags) == 0 {
+		t.Fatal("no crags within 5km of Squamish; maxDistance is metres upstream, check the conversion")
+	}
+	if got.Origin.Source != "gazetteer" {
+		t.Errorf("Origin.Source = %q, want gazetteer", got.Origin.Source)
+	}
+	for _, cr := range got.Crags {
+		if cr.ClimbCount == 0 {
+			t.Errorf("%q returned with zero climbs", cr.Name)
+		}
+		if cr.UUID == "" || cr.Name == "" {
+			t.Errorf("crag missing identity: %+v", cr)
+		}
+		if cr.DistanceKm > radiusKm {
+			t.Errorf("%q at %.2f km is outside the %g km radius", cr.Name, cr.DistanceKm, radiusKm)
+		}
+	}
+	if got.Crags[0].ClimbCount < got.Crags[len(got.Crags)-1].ClimbCount {
+		t.Error("results are not sorted by climb count")
+	}
+}
+
+// An ocean coordinate is a legitimately empty answer, not a failure.
+func TestLiveCragsNearEmpty(t *testing.T) {
+	_, ctx, gql := liveClient(t)
+	h := tools.HandleCragsNear(gql, geo.NewGazetteer())
+
+	_, got, err := h(ctx, nil, tools.CragsNearArgs{LngLat: []float64{-139, -49}})
 	if err != nil {
 		t.Fatalf("expected empty result, got error: %v", err)
 	}

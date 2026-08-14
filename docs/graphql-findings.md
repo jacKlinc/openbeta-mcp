@@ -11,7 +11,7 @@ Reference bbox throughout: Squamish, `[-123.2, 49.6, -122.9, 49.8]`.
 ## 1. `totalClimbs` is not a climb count
 
 This is the most consequential finding, and it inverts the filter originally specified in
-[plan.md](plan.md).
+[plan.md](poc/plan.md).
 
 `Area.totalClimbs` reads `0` on the large majority of leaf crags that hold climbs:
 
@@ -35,7 +35,7 @@ Each field is reliable exactly where the other is not:
 - **Leaf crags** — `climbs` is populated, `totalClimbs` is usually 0.
 - **Parent areas** — `climbs` is always `[]`, `totalClimbs` aggregates descendants.
 
-Hence `climbCount` in [crags_within.go](../internal/openbeta/crags_within.go): prefer
+Hence `climbCount` in [crags_near.go](../internal/tools/crags_near.go): prefer
 `len(climbs)`, fall back to `totalClimbs`.
 
 The cost is requesting `climbs { uuid }` inside `cragsWithin`, which takes the query from ~130ms to
@@ -57,6 +57,10 @@ Same bbox, varying zoom:
 Below 11 you get organizational parents ("Squamish", "Stawamus Chief"); at 11 and above you get
 individual crags. Nothing in between, and no mixing of the two.
 
+The tool built on this is gone — `crags_within` was replaced by `crags_near`, which searches by
+point and radius and returns leaf crags only, so it never has to pick a hierarchy level. The finding
+stands as a property of the API.
+
 This corrects plan.md's reading. plan.md observed 21 results with 9 organizational parents and
 concluded that `cragsWithin` "returns area-hierarchy nodes at any level" that must be filtered
 apart. That observation was taken at low zoom, where parents are *all* you get — they are what the
@@ -76,16 +80,39 @@ Climbs live only on leaf areas. Reading `climbs` alone reports a 369-route wall 
 Note that `leaf: true` does not imply climbs are present: Western Dihedrals is a leaf with
 `climbs: []`.
 
-## 4. `cragsNear` exists
+## 4. `cragsNear` exists, but returns no `climbs` and no `children`
 
 plan.md records that no point/radius resolver exists on the schema. It does:
 
 ```graphql
-cragsNear(placeId: String, lnglat: Point, minDistance: Int, maxDistance: Int, includeCrags: Boolean): [CragsNear]
+cragsNear(placeId: String, lnglat: Point, minDistance: Int = 0, maxDistance: Int = 48000, includeCrags: Boolean = false): [CragsNear]
 input Point { lat: Float, lng: Float }
 ```
 
-Out of scope for the two-tool POC, but a future proximity tool would not need to synthesize a bbox.
+A point/radius search is a better fit for "what can I climb near here" than a synthesized bbox, and
+unlike `cragsWithin` it never returns organizational parents — every result is `leaf: true`. But the
+sub-documents come back empty.
+
+Squamish, `lnglat {49.665393, -123.253667}`, `maxDistance: 5000`, `includeCrags: true` — 40 crags,
+of which **0 have `climbs` and 0 have `children`**. They arrive as `[]`, not `null`, so there is no
+`errors` array to notice and no way to select around it. Same areas, same moment, via `area(uuid:)`:
+
+| Area            | via `cragsNear` | via `area(uuid:)` |
+| --------------- | --------------- | ----------------- |
+| Petrifying Wall | `climbs: []`    | 74 climbs         |
+| Woodstock       | `climbs: []`    | 12 climbs         |
+
+Populated on each result: `uuid`, `areaName`, `pathTokens`, `metadata`, and `totalClimbs` — which
+carries finding 1's unreliability with it. Petrifying Wall reports `totalClimbs: 0` while holding 74
+climbs.
+
+The consequence is that **`cragsNear` cannot distinguish a real crag from an empty one.** The
+`len(climbs) > 0` test finding 1 depends on is unavailable, and `totalClimbs` is not a substitute.
+Filtering empty areas has to happen after a second call, not within the search — see
+[cragsNear/README.md](cragsNear/README.md) for the two-step shape that follows from this.
+
+`includeCrags` defaults to `false`, and with it unset `crags` is empty regardless of radius, so it
+is worth passing explicitly.
 
 ## 5. Endpoint and error shapes
 

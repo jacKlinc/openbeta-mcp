@@ -9,6 +9,7 @@ import (
 	"github.com/Khan/genqlient/graphql"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/jacKlinc/openbeta-mcp/internal/geo"
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
 	"github.com/jacKlinc/openbeta-mcp/internal/tools"
 )
@@ -30,13 +31,15 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 	gqlClient := graphql.NewClient(client.Endpoint(), client.HTTPClient())
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name: "crags_within",
-		Description: "Find rock climbing areas inside a geographic bounding box. " +
-			"Returns each crag's name, coordinates, climb count and location in the area " +
-			"hierarchy, sorted with the largest crags first. Areas holding no climbs are " +
-			"omitted. Use this to answer 'what can I climb near here', then pass a returned " +
+		Name: "crags_near",
+		Description: "Find rock climbing areas near a place. Give a well-known climbing " +
+			"destination or town as 'place' (for example Squamish, Bishop, Fontainebleau); " +
+			"if the place is not recognised the error will say so, and you can retry with " +
+			"'lnglat' as [longitude, latitude]. Returns each crag's name, coordinates, " +
+			"distance and climb count, largest first, and only crags that actually hold " +
+			"climbs. Use this to answer 'what can I climb near here', then pass a returned " +
 			"uuid to get_area_details for the routes.",
-	}, tools.HandleCragsWithin(&gqlClient))
+	}, tools.HandleCragsNear(&gqlClient, geo.NewGazetteer()))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "get_area_details",
