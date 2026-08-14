@@ -1,13 +1,7 @@
 package openbeta
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -61,89 +55,4 @@ func New(opts ...Option) *Client {
 		o(c)
 	}
 	return c
-}
-
-// graphQLError is one entry in a GraphQL response's errors array.
-type graphQLError struct {
-	Message string `json:"message"`
-}
-
-// APIError reports errors returned by the GraphQL layer itself — the request
-// reached the API and it declined. Distinct from transport failures so callers
-// can tell "upstream said no" from "could not reach upstream" (FR-16, FR-17).
-type APIError struct {
-	Messages []string
-}
-
-func (e *APIError) Error() string {
-	return "openbeta graphql error: " + strings.Join(e.Messages, "; ")
-}
-
-// execute runs one GraphQL query and decodes data into out.
-func (c *Client) execute(ctx context.Context, query string, vars map[string]any, out any) error {
-	body, err := json.Marshal(map[string]any{
-		"query":     query,
-		"variables": vars,
-	})
-	if err != nil {
-		return fmt.Errorf("encoding request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("building request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return fmt.Errorf("calling openbeta api: %w", err)
-	}
-	defer resp.Body.Close()
-
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("reading response: %w", err)
-	}
-
-	// A GraphQL error is reported in the body with a 200, but the API also
-	// returns bare non-2xx pages (a 502 on malformed queries), which will not
-	// parse as JSON. Check status first so the error names the real cause.
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("openbeta api returned %s: %s", resp.Status, truncate(string(raw), 200))
-	}
-
-	var envelope struct {
-		Data   json.RawMessage `json:"data"`
-		Errors []graphQLError  `json:"errors"`
-	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return fmt.Errorf("decoding response: %w (body: %s)", err, truncate(string(raw), 200))
-	}
-
-	if len(envelope.Errors) > 0 {
-		msgs := make([]string, len(envelope.Errors))
-		for i, e := range envelope.Errors {
-			msgs[i] = e.Message
-		}
-		return &APIError{Messages: msgs}
-	}
-
-	if len(envelope.Data) == 0 {
-		return fmt.Errorf("openbeta api returned no data and no errors")
-	}
-
-	if err := json.Unmarshal(envelope.Data, out); err != nil {
-		return fmt.Errorf("decoding data: %w", err)
-	}
-	return nil
-}
-
-func truncate(s string, n int) string {
-	s = strings.TrimSpace(s)
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "…"
 }

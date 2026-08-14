@@ -9,7 +9,6 @@ import (
 	"github.com/Khan/genqlient/graphql"
 
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
-	"github.com/jacKlinc/openbeta-mcp/internal/openbeta/generated"
 	"github.com/jacKlinc/openbeta-mcp/internal/tools"
 )
 
@@ -84,7 +83,7 @@ func TestLiveCragsWithinKeepsZeroTotalClimbsCrags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CragsWithin: %v", err)
 	}
-	byName := make(map[string]openbeta.CragSummary, len(got.Crags))
+	byName := make(map[string]tools.CragSummary, len(got.Crags))
 	for _, cr := range got.Crags {
 		byName[cr.Name] = cr
 	}
@@ -176,7 +175,7 @@ func TestLiveGetAreaLeafHasClimbs(t *testing.T) {
 			if cl.Name == "" {
 				t.Errorf("climb %s has no name", cl.Uuid)
 			}
-			if anyGrade(cl.Grades) != "" {
+			if tools.PreferredGrade(cl.Grades, child.Area.Metadata.IsBoulder) != "" {
 				graded++
 			}
 		}
@@ -190,19 +189,6 @@ func TestLiveGetAreaLeafHasClimbs(t *testing.T) {
 	if !found {
 		t.Error("no child of Stawamus Chief returned any climbs")
 	}
-}
-
-// anyGrade returns the first populated grade string, whichever system it is in.
-// Which sibling is filled depends on the area's gradeContext and the climb type
-// — YDS for Squamish trad, vscale for its boulders, the rest empty — so the test
-// asks whether the climb is graded at all rather than picking one field.
-func anyGrade(g generated.GetAreaDetailsAreaClimbsClimbGradesGradeType) string {
-	for _, s := range []string{g.Yds, g.Vscale, g.Font, g.French, g.Uiaa, g.Ewbank, g.Wi} {
-		if s != "" {
-			return s
-		}
-	}
-	return ""
 }
 
 func TestLiveGetAreaNotFound(t *testing.T) {

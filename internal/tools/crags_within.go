@@ -9,7 +9,6 @@ import (
 	"github.com/Khan/genqlient/graphql"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta/generated"
 )
 
@@ -38,13 +37,23 @@ type CragsWithinArgs struct {
 	Zoom *float64 `json:"zoom,omitempty" jsonschema:"Map zoom level controlling which level of the area hierarchy is returned. 11 or above returns individual crags; below 11 returns larger parent regions. Defaults to 13."`
 }
 
+type CragSummary struct {
+	UUID       string   `json:"uuid"`
+	Name       string   `json:"name"`
+	Lat        float64  `json:"lat"`
+	Lng        float64  `json:"lng"`
+	ClimbCount int      `json:"climbCount"`
+	IsBoulder  bool     `json:"isBoulder,omitempty"`
+	Path       []string `json:"path,omitempty"`
+}
+
 // CragsWithinResult is the output schema for crags_within.
 //
 // Count and len(Crags) differ whenever the box holds more than MaxCrags: Count
 // is how many crags are in the box, Crags is the densest slice of them.
 type CragsWithinResult struct {
-	Crags []openbeta.CragSummary `json:"crags" jsonschema:"The crags returned, densest first. Capped at 20; when count exceeds that, this is only the top slice."`
-	Count int                    `json:"count" jsonschema:"How many crags with climbs are in the bounding box. May be larger than the crags array, which is capped at 20 — narrow the bbox or raise the zoom to see the rest."`
+	Crags []CragSummary `json:"crags" jsonschema:"The crags returned, densest first. Capped at 20; when count exceeds that, this is only the top slice."`
+	Count int           `json:"count" jsonschema:"How many crags with climbs are in the bounding box. May be larger than the crags array, which is capped at 20 — narrow the bbox or raise the zoom to see the rest."`
 }
 
 // core: no MCP types, returns a plain error
@@ -79,9 +88,9 @@ func cragsWithin(ctx context.Context, gql graphql.Client, args CragsWithinArgs) 
 		crags.CragsWithin = crags.CragsWithin[:MaxCrags]
 	}
 	// Drops the climbs array
-	out := make([]openbeta.CragSummary, 0, len(crags.CragsWithin))
+	out := make([]CragSummary, 0, len(crags.CragsWithin))
 	for _, a := range crags.CragsWithin {
-		out = append(out, openbeta.CragSummary{
+		out = append(out, CragSummary{
 			UUID:       a.Uuid,
 			Name:       a.AreaName,
 			Lat:        a.Metadata.Lat,
