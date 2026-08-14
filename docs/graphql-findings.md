@@ -114,7 +114,44 @@ Filtering empty areas has to happen after a second call, not within the search �
 `includeCrags` defaults to `false`, and with it unset `crags` is empty regardless of radius, so it
 is worth passing explicitly.
 
-## 5. Endpoint and error shapes
+## 5. `Climb.pitches` is empty, and `length` is the only pitch signal
+
+`Climb.pitches` is typed as `[Pitch]` with a `pitchNumber` on each, and returns `[]` on every climb
+checked. The Apron, `17a692c8-9e34-5511-90e7-44ef23d10fa1`, returns 51 climbs and **not one has pitch
+data** — including Diedre, which is six pitches.
+
+`content.description` is empty on all of them too, so there is no text to parse for "5 pitches"
+either.
+
+That leaves `length`, in metres, which separates cleanly for Squamish trad:
+
+| Length | Reading |
+| ------ | ------- |
+| 15, 23, 27, 30, 36, 45 | single pitch |
+| 61, 70, 76, 91, 115, 121, 152, 182, 250 | multi-pitch |
+
+The multi-pitch values are 200/300/400/500 ft imports, and a rope length sits in the gap, so
+`find_climbs` treats 60 m and above as multi-pitch.
+
+The catch is that **9 of 59 trad climbs report `length: -1`**, Diedre among them — the signal is
+missing exactly where it is most wanted. So the tool reports three values, `yes`/`no`/`unknown`, and
+`unknown` survives a multi-pitch filter rather than being read as single pitch.
+
+## 6. YDS grades are frequently imprecise
+
+Across four Squamish areas, 30 distinct `grades.yds` values over 59 climbs. Most are exact (`5.9`,
+`5.10c`), but a meaningful minority are not:
+
+- **Bare numbers** — `5.10`, `5.12`. The letter was never recorded, so the route could be anywhere in
+  `a`–`d`.
+- **Slashes** — `5.11a/b`, `5.12a/b`.
+- **Modifiers** — `5.9+`, `5.8-`, `5.10-`, `5.12+`.
+
+`internal/grade` parses each into the span it covers and matches ranges by overlap, so a route
+recorded as `5.10` is returned for a 5.8–5.10b search. `+`/`-` order routes within a number rather
+than crossing into the next, and the scale has no letters below 5.10, so `5.9+` is exactly 5.9.
+
+## 7. Endpoint and error shapes
 
 - The endpoint is `https://api.openbeta.io/graphql`. The bare origin answers trivial queries but
   returns a plain-text `error code: 502` for larger ones.
@@ -122,7 +159,7 @@ is worth passing explicitly.
 - Malformed queries can return a non-JSON body, so status is checked before parsing.
 - `area(uuid:)` returns `data.area: null` for an unknown UUID rather than an error.
 
-## 6. Schema details worth recording
+## 8. Schema details worth recording
 
 `SearchWithinFilter` types `bbox` as a bare `[Float]`, so a transposed pair is not caught upstream.
 Order is `[minLng, minLat, maxLng, maxLat]` — longitude first. `BBox.Validate` catches the common
@@ -133,7 +170,7 @@ lat/lng transposition via the coordinate range check.
 
 `GradeType` carries `vscale`, `yds`, `ewbank`, `french`, `brazilianCrux`, `font`, `uiaa`, `wi`.
 
-## 7. Missing values are encoded in-band, not as null
+## 9. Missing values are encoded in-band, not as null
 
 `Climb` uses placeholder values rather than nulls where data is absent:
 

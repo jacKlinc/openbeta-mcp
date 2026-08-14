@@ -9,6 +9,7 @@ import (
 	"github.com/Khan/genqlient/graphql"
 
 	"github.com/jacKlinc/openbeta-mcp/internal/geo"
+	"github.com/jacKlinc/openbeta-mcp/internal/grade"
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
 	"github.com/jacKlinc/openbeta-mcp/internal/tools"
 )
@@ -158,5 +159,56 @@ func TestLiveCragsNearEmpty(t *testing.T) {
 	}
 	if got.Count != 0 {
 		t.Errorf("expected no crags in the South Pacific, got %d", got.Count)
+	}
+}
+
+// find_climbs end to end against Squamish, which has known matches: Granville
+// Street 5.8 at 115m, Sparrow 5.9 at 182m, Long Time No See 5.9 at 250m.
+//
+// Squamish rather than Whistler deliberately — Whistler holds no multi-pitch
+// trad at all in OpenBeta, so it would make a test that passes on an empty
+// result.
+func TestLiveFindClimbs(t *testing.T) {
+	_, ctx, gql := liveClient(t)
+	h := tools.HandleFindClimbs(gql, geo.NewGazetteer())
+
+	km := 10.0
+	_, got, err := h(ctx, nil, tools.FindClimbsArgs{
+		Place: "Squamish", MaxDistanceKm: &km,
+		MinGrade: "5.8", MaxGrade: "5.10b", MultipitchOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("FindClimbs: %v", err)
+	}
+	if got.CragsScanned == 0 {
+		t.Fatal("no crags scanned, so the filter proved nothing")
+	}
+	if len(got.Climbs) == 0 {
+		t.Fatal("expected multi-pitch trad in Squamish between 5.8 and 5.10b")
+	}
+
+	var sawKnownMultipitch bool
+	for _, c := range got.Climbs {
+		if c.Multipitch == tools.PitchesNo {
+			t.Errorf("%q is single pitch and should not be in a multipitchOnly result", c.Name)
+		}
+		if c.Multipitch == tools.PitchesYes {
+			sawKnownMultipitch = true
+		}
+		// Every result must be inside the requested range. Parsing here rather
+		// than trusting the tool is the point of the assertion.
+		span, err := grade.ParseYDS(c.Grade)
+		if err != nil {
+			t.Errorf("%q has an unparseable grade %q", c.Name, c.Grade)
+			continue
+		}
+		lo, _ := grade.ParseYDS("5.8")
+		hi, _ := grade.ParseYDS("5.10b")
+		if !span.Overlaps(grade.Span{Lo: lo.Lo, Hi: hi.Hi}) {
+			t.Errorf("%q at %s is outside 5.8-5.10b", c.Name, c.Grade)
+		}
+	}
+	if !sawKnownMultipitch {
+		t.Error("expected at least one route with a recorded multi-pitch length")
 	}
 }

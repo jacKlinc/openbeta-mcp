@@ -73,6 +73,17 @@ Filling in climb counts costs one extra request per crag: the upstream `cragsNea
 areas with an empty `climbs` list, so the count comes from a follow-up call. See
 [docs/graphql-findings.md](docs/graphql-findings.md) §4.
 
+**`find_climbs(place | lnglat, minGrade, maxGrade, multipitchOnly)`** — individual trad routes near a
+point, filtered by YDS grade.
+
+Grade bounds are inclusive at the edges: a route recorded imprecisely as `5.10` is returned for a
+5.8–5.10b search, because the letter was never recorded rather than the route lacking one.
+
+`multipitch` is `yes`, `no` or `unknown` — the API stores **no pitch count**, so it is inferred from
+route length, and `unknown` means the length was never recorded. A `multipitchOnly` search keeps the
+unknowns rather than dropping them. `cragsScanned` reports how many crags were searched, so an empty
+result is distinguishable from an empty search. Trad and YDS only for now.
+
 **`get_area_details(areaId)`** — name, coordinates, description, routes and sub-areas for one area.
 
 Areas hold either routes or sub-areas, never both. A large area returns its children; descend
