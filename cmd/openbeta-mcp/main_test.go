@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"io"
@@ -34,33 +35,95 @@ func TestNormalShutdownExitsZero(t *testing.T) {
 		t.Fatalf("building binary: %v\n%s", err, out)
 	}
 
+	// A hangup reaches the binary two different ways, and they take different
+	// code paths, so both are exercised:
+	//
+	//   idle       — the server has answered and is waiting. Run returns nil.
+	//   mid-message — stdin closes while the server is still working. Run returns
+	//                 the SDK's "server is closing" error, which is the only case
+	//                 isNormalShutdown's string match ever sees.
+	//
+	// Only the second can catch an SDK rewording. It was once the whole test and
+	// was flaky, because which path you get depends on machine speed — the fix is
+	// to accept either outcome as success in both, not to drop one.
+	for _, tt := range []struct {
+		name             string
+		waitForInitReply bool
+	}{
+		{"hangup while idle", true},
+		{"hangup mid-message", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			stderr, err := runUntilHangup(t, bin, tt.waitForInitReply)
+			if err != nil {
+				t.Fatalf("clean client hangup exited non-zero (%v); stderr:\n%s\n"+
+					"The SDK likely reworded its shutdown error — update isNormalShutdown to match.",
+					err, stderr)
+			}
+			if !strings.Contains(stderr, "shutting down") {
+				t.Errorf("expected a shutdown log line, got:\n%s", stderr)
+			}
+		})
+	}
+}
+
+// runUntilHangup starts the binary, sends initialize, closes stdin and reports
+// what the process wrote to stderr along with its exit error.
+//
+// waitForInitReply decides which hangup is simulated: true blocks until the
+// initialize response comes back, so stdin closes with the server idle; false
+// closes immediately, so it usually closes mid-message.
+func runUntilHangup(t *testing.T, bin string, waitForInitReply bool) (string, error) {
+	t.Helper()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// A session must exist before the SDK reports hangup as an error; an
-	// immediate EOF returns nil and would not exercise the check. Point the
-	// binary at an unreachable endpoint so the test never touches the network —
-	// initialize does not call upstream.
+	// Point the binary at an unreachable endpoint so the test never touches the
+	// network — initialize does not call upstream.
 	cmd := exec.CommandContext(ctx, bin, "-endpoint", "http://127.0.0.1:1/graphql")
-	cmd.Stdin = strings.NewReader(
-		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":` +
-			`{"protocolVersion":"2025-06-18","capabilities":{},` +
-			`"clientInfo":{"name":"test","version":"1"}}}` + "\n")
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatalf("stdin pipe: %v", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatalf("stdout pipe: %v", err)
+	}
 
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 
-	// Stdin hits EOF as soon as that one message is read — exactly what a client
-	// hanging up looks like.
-	err := cmd.Run()
-	if err != nil {
-		t.Fatalf("clean client hangup exited non-zero (%v); stderr:\n%s\n"+
-			"The SDK likely reworded its shutdown error — update isNormalShutdown to match.",
-			err, stderr.String())
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("starting binary: %v", err)
 	}
-	if !strings.Contains(stderr.String(), "shutting down") {
-		t.Errorf("expected a shutdown log line, got:\n%s", stderr.String())
+
+	if _, err := io.WriteString(stdin,
+		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":`+
+			`{"protocolVersion":"2025-06-18","capabilities":{},`+
+			`"clientInfo":{"name":"test","version":"1"}}}`+"\n"); err != nil {
+		t.Fatalf("writing initialize: %v", err)
 	}
+
+	// Handing the message over is not the same as the server having processed it,
+	// so reading the reply is what makes "idle" mean idle.
+	if waitForInitReply && !bufio.NewScanner(stdout).Scan() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		t.Fatalf("no initialize response before hangup; stderr:\n%s", stderr.String())
+	}
+
+	// Closing stdin is exactly what a client hanging up looks like.
+	if err := stdin.Close(); err != nil {
+		t.Fatalf("closing stdin: %v", err)
+	}
+
+	// Wait first: it blocks until the goroutine copying the child's stderr into
+	// the builder has finished, so reading the builder before it is both a data
+	// race and liable to miss the last line.
+	waitErr := cmd.Wait()
+	return stderr.String(), waitErr
 }
 
 func TestIsNormalShutdown(t *testing.T) {

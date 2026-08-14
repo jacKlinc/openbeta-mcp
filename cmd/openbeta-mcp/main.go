@@ -49,13 +49,16 @@ func main() {
 	server := mcpserver.New(client, version)
 
 	log.Printf("serving %s on stdio (version %s)", *endpoint, version)
-	if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil {
-		// A cancelled context or a hung-up client are both ordinary shutdown,
-		// not failures.
-		if ctx.Err() != nil || isNormalShutdown(err) {
-			log.Print("shutting down")
-			return
-		}
+	err := server.Run(ctx, &mcp.StdioTransport{})
+	// A hangup surfaces two different ways depending on what the server was doing
+	// when stdin closed: idle, Run returns nil; mid-message, it returns the SDK's
+	// "server is closing" error. A cancelled context is ordinary shutdown too.
+	// All three are the same event and get the same log line — the nil case is
+	// listed first so isNormalShutdown is never handed a nil error.
+	switch {
+	case err == nil, ctx.Err() != nil, isNormalShutdown(err):
+		log.Print("shutting down")
+	default:
 		log.Fatalf("server failed: %v", err)
 	}
 }
