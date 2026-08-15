@@ -8,46 +8,6 @@ import (
 	"github.com/Khan/genqlient/graphql"
 )
 
-type AreaFilter struct {
-	Match      string `json:"match"`
-	ExactMatch bool   `json:"exactMatch"`
-}
-
-// GetMatch returns AreaFilter.Match, and is useful for accessing the field via an interface.
-func (v *AreaFilter) GetMatch() string { return v.Match }
-
-// GetExactMatch returns AreaFilter.ExactMatch, and is useful for accessing the field via an interface.
-func (v *AreaFilter) GetExactMatch() bool { return v.ExactMatch }
-
-type CompareType string
-
-const (
-	CompareTypeLt CompareType = "lt"
-	CompareTypeGt CompareType = "gt"
-	CompareTypeEq CompareType = "eq"
-)
-
-var AllCompareType = []CompareType{
-	CompareTypeLt,
-	CompareTypeGt,
-	CompareTypeEq,
-}
-
-type ComparisonFilter struct {
-	Field      Field       `json:"field"`
-	Num        float64     `json:"num"`
-	Comparison CompareType `json:"comparison"`
-}
-
-// GetField returns ComparisonFilter.Field, and is useful for accessing the field via an interface.
-func (v *ComparisonFilter) GetField() Field { return v.Field }
-
-// GetNum returns ComparisonFilter.Num, and is useful for accessing the field via an interface.
-func (v *ComparisonFilter) GetNum() float64 { return v.Num }
-
-// GetComparison returns ComparisonFilter.Comparison, and is useful for accessing the field via an interface.
-func (v *ComparisonFilter) GetComparison() CompareType { return v.Comparison }
-
 // CragsNearCragsNear includes the requested fields of the GraphQL type CragsNear.
 type CragsNearCragsNear struct {
 	Count int                           `json:"count"`
@@ -128,94 +88,6 @@ type CragsNearResponse struct {
 
 // GetCragsNear returns CragsNearResponse.CragsNear, and is useful for accessing the field via an interface.
 func (v *CragsNearResponse) GetCragsNear() []CragsNearCragsNear { return v.CragsNear }
-
-type Field string
-
-const (
-	FieldDensity     Field = "density"
-	FieldTotalclimbs Field = "totalClimbs"
-)
-
-var AllField = []Field{
-	FieldDensity,
-	FieldTotalclimbs,
-}
-
-type Filter struct {
-	Area_name     AreaFilter         `json:"area_name"`
-	Leaf_status   LeafFilter         `json:"leaf_status"`
-	Path_tokens   PathFilter         `json:"path_tokens"`
-	Field_compare []ComparisonFilter `json:"field_compare"`
-}
-
-// GetArea_name returns Filter.Area_name, and is useful for accessing the field via an interface.
-func (v *Filter) GetArea_name() AreaFilter { return v.Area_name }
-
-// GetLeaf_status returns Filter.Leaf_status, and is useful for accessing the field via an interface.
-func (v *Filter) GetLeaf_status() LeafFilter { return v.Leaf_status }
-
-// GetPath_tokens returns Filter.Path_tokens, and is useful for accessing the field via an interface.
-func (v *Filter) GetPath_tokens() PathFilter { return v.Path_tokens }
-
-// GetField_compare returns Filter.Field_compare, and is useful for accessing the field via an interface.
-func (v *Filter) GetField_compare() []ComparisonFilter { return v.Field_compare }
-
-// FindAreaAreasArea includes the requested fields of the GraphQL type Area.
-// The GraphQL type's documentation follows.
-//
-// A climbing area, wall or crag
-type FindAreaAreasArea struct {
-	// We use UUID for identification of areas. The id field is used in internal database relations.
-	Uuid string `json:"uuid"`
-	// areaNames of this areas parents, traversing up the heirarchy to the root area.
-	PathTokens []string `json:"pathTokens"`
-	AreaName   string   `json:"areaName"`
-	// ShortCodes are short, globally uniqe codes that identify significant climbing areas
-	ShortCode string `json:"shortCode"`
-	// The total number of climbs in this area
-	TotalClimbs int                       `json:"totalClimbs"`
-	Metadata    FindAreaAreasAreaMetadata `json:"metadata"`
-}
-
-// GetUuid returns FindAreaAreasArea.Uuid, and is useful for accessing the field via an interface.
-func (v *FindAreaAreasArea) GetUuid() string { return v.Uuid }
-
-// GetPathTokens returns FindAreaAreasArea.PathTokens, and is useful for accessing the field via an interface.
-func (v *FindAreaAreasArea) GetPathTokens() []string { return v.PathTokens }
-
-// GetAreaName returns FindAreaAreasArea.AreaName, and is useful for accessing the field via an interface.
-func (v *FindAreaAreasArea) GetAreaName() string { return v.AreaName }
-
-// GetShortCode returns FindAreaAreasArea.ShortCode, and is useful for accessing the field via an interface.
-func (v *FindAreaAreasArea) GetShortCode() string { return v.ShortCode }
-
-// GetTotalClimbs returns FindAreaAreasArea.TotalClimbs, and is useful for accessing the field via an interface.
-func (v *FindAreaAreasArea) GetTotalClimbs() int { return v.TotalClimbs }
-
-// GetMetadata returns FindAreaAreasArea.Metadata, and is useful for accessing the field via an interface.
-func (v *FindAreaAreasArea) GetMetadata() FindAreaAreasAreaMetadata { return v.Metadata }
-
-// FindAreaAreasAreaMetadata includes the requested fields of the GraphQL type AreaMetadata.
-type FindAreaAreasAreaMetadata struct {
-	// centroid longitude of this areas bounding box
-	Lng float64 `json:"lng"`
-	// centroid latitude of this areas bounding box
-	Lat float64 `json:"lat"`
-}
-
-// GetLng returns FindAreaAreasAreaMetadata.Lng, and is useful for accessing the field via an interface.
-func (v *FindAreaAreasAreaMetadata) GetLng() float64 { return v.Lng }
-
-// GetLat returns FindAreaAreasAreaMetadata.Lat, and is useful for accessing the field via an interface.
-func (v *FindAreaAreasAreaMetadata) GetLat() float64 { return v.Lat }
-
-// FindAreaResponse is returned by FindArea on success.
-type FindAreaResponse struct {
-	Areas []FindAreaAreasArea `json:"areas"`
-}
-
-// GetAreas returns FindAreaResponse.Areas, and is useful for accessing the field via an interface.
-func (v *FindAreaResponse) GetAreas() []FindAreaAreasArea { return v.Areas }
 
 // GetAreaDetailsArea includes the requested fields of the GraphQL type Area.
 // The GraphQL type's documentation follows.
@@ -523,28 +395,6 @@ type GetAreaDetailsResponse struct {
 // GetArea returns GetAreaDetailsResponse.Area, and is useful for accessing the field via an interface.
 func (v *GetAreaDetailsResponse) GetArea() GetAreaDetailsArea { return v.Area }
 
-type LeafFilter struct {
-	IsLeaf bool `json:"isLeaf"`
-}
-
-// GetIsLeaf returns LeafFilter.IsLeaf, and is useful for accessing the field via an interface.
-func (v *LeafFilter) GetIsLeaf() bool { return v.IsLeaf }
-
-type PathFilter struct {
-	Tokens     []string `json:"tokens"`
-	ExactMatch bool     `json:"exactMatch"`
-	Size       int      `json:"size"`
-}
-
-// GetTokens returns PathFilter.Tokens, and is useful for accessing the field via an interface.
-func (v *PathFilter) GetTokens() []string { return v.Tokens }
-
-// GetExactMatch returns PathFilter.ExactMatch, and is useful for accessing the field via an interface.
-func (v *PathFilter) GetExactMatch() bool { return v.ExactMatch }
-
-// GetSize returns PathFilter.Size, and is useful for accessing the field via an interface.
-func (v *PathFilter) GetSize() int { return v.Size }
-
 type Point struct {
 	Lat float64 `json:"lat"`
 	Lng float64 `json:"lng"`
@@ -602,18 +452,6 @@ func (v *__CragsNearInput) GetLnglat() Point { return v.Lnglat }
 // GetMaxDistance returns __CragsNearInput.MaxDistance, and is useful for accessing the field via an interface.
 func (v *__CragsNearInput) GetMaxDistance() int { return v.MaxDistance }
 
-// __FindAreaInput is used internally by genqlient
-type __FindAreaInput struct {
-	Filter Filter `json:"filter"`
-	Limit  int    `json:"limit"`
-}
-
-// GetFilter returns __FindAreaInput.Filter, and is useful for accessing the field via an interface.
-func (v *__FindAreaInput) GetFilter() Filter { return v.Filter }
-
-// GetLimit returns __FindAreaInput.Limit, and is useful for accessing the field via an interface.
-func (v *__FindAreaInput) GetLimit() int { return v.Limit }
-
 // __GetAreaDetailsInput is used internally by genqlient
 type __GetAreaDetailsInput struct {
 	Uuid string `json:"uuid"`
@@ -665,50 +503,6 @@ func CragsNear(
 	}
 
 	data_ = &CragsNearResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The query executed by FindArea.
-const FindArea_Operation = `
-query FindArea ($filter: Filter, $limit: Int) {
-	areas(filter: $filter, limit: $limit) {
-		uuid
-		pathTokens
-		areaName
-		shortCode
-		totalClimbs
-		metadata {
-			lng
-			lat
-		}
-	}
-}
-`
-
-func FindArea(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	filter Filter,
-	limit int,
-) (data_ *FindAreaResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "FindArea",
-		Query:  FindArea_Operation,
-		Variables: &__FindAreaInput{
-			Filter: filter,
-			Limit:  limit,
-		},
-	}
-
-	data_ = &FindAreaResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
