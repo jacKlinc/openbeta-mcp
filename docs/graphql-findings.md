@@ -11,7 +11,7 @@ Reference bbox throughout: Squamish, `[-123.2, 49.6, -122.9, 49.8]`.
 ## 1. `totalClimbs` is not a climb count
 
 This is the most consequential finding, and it inverts the filter originally specified in
-[plan.md](plan.md).
+[plan.md](poc/plan.md).
 
 `Area.totalClimbs` reads `0` on the large majority of leaf crags that hold climbs:
 
@@ -35,7 +35,7 @@ Each field is reliable exactly where the other is not:
 - **Leaf crags** — `climbs` is populated, `totalClimbs` is usually 0.
 - **Parent areas** — `climbs` is always `[]`, `totalClimbs` aggregates descendants.
 
-Hence `climbCount` in [crags_within.go](../internal/openbeta/crags_within.go): prefer
+Hence `climbCount` in [crags_near.go](../internal/tools/crags_near.go): prefer
 `len(climbs)`, fall back to `totalClimbs`.
 
 The cost is requesting `climbs { uuid }` inside `cragsWithin`, which takes the query from ~130ms to
@@ -57,6 +57,10 @@ Same bbox, varying zoom:
 Below 11 you get organizational parents ("Squamish", "Stawamus Chief"); at 11 and above you get
 individual crags. Nothing in between, and no mixing of the two.
 
+The tool built on this is gone — `crags_within` was replaced by `crags_near`, which searches by
+point and radius and returns leaf crags only, so it never has to pick a hierarchy level. The finding
+stands as a property of the API.
+
 This corrects plan.md's reading. plan.md observed 21 results with 9 organizational parents and
 concluded that `cragsWithin` "returns area-hierarchy nodes at any level" that must be filtered
 apart. That observation was taken at low zoom, where parents are *all* you get — they are what the
@@ -76,18 +80,78 @@ Climbs live only on leaf areas. Reading `climbs` alone reports a 369-route wall 
 Note that `leaf: true` does not imply climbs are present: Western Dihedrals is a leaf with
 `climbs: []`.
 
-## 4. `cragsNear` exists
+## 4. `cragsNear` exists, but returns no `climbs` and no `children`
 
 plan.md records that no point/radius resolver exists on the schema. It does:
 
 ```graphql
-cragsNear(placeId: String, lnglat: Point, minDistance: Int, maxDistance: Int, includeCrags: Boolean): [CragsNear]
+cragsNear(placeId: String, lnglat: Point, minDistance: Int = 0, maxDistance: Int = 48000, includeCrags: Boolean = false): [CragsNear]
 input Point { lat: Float, lng: Float }
 ```
 
-Out of scope for the two-tool POC, but a future proximity tool would not need to synthesize a bbox.
+A point/radius search is a better fit for "what can I climb near here" than a synthesized bbox, and
+unlike `cragsWithin` it never returns organizational parents — every result is `leaf: true`. But the
+sub-documents come back empty.
 
-## 5. Endpoint and error shapes
+Squamish, `lnglat {49.665393, -123.253667}`, `maxDistance: 5000`, `includeCrags: true` — 40 crags,
+of which **0 have `climbs` and 0 have `children`**. They arrive as `[]`, not `null`, so there is no
+`errors` array to notice and no way to select around it. Same areas, same moment, via `area(uuid:)`:
+
+| Area            | via `cragsNear` | via `area(uuid:)` |
+| --------------- | --------------- | ----------------- |
+| Petrifying Wall | `climbs: []`    | 74 climbs         |
+| Woodstock       | `climbs: []`    | 12 climbs         |
+
+Populated on each result: `uuid`, `areaName`, `pathTokens`, `metadata`, and `totalClimbs` — which
+carries finding 1's unreliability with it. Petrifying Wall reports `totalClimbs: 0` while holding 74
+climbs.
+
+The consequence is that **`cragsNear` cannot distinguish a real crag from an empty one.** The
+`len(climbs) > 0` test finding 1 depends on is unavailable, and `totalClimbs` is not a substitute.
+Filtering empty areas has to happen after a second call, not within the search — see
+[cragsNear/README.md](cragsNear/README.md) for the two-step shape that follows from this.
+
+`includeCrags` defaults to `false`, and with it unset `crags` is empty regardless of radius, so it
+is worth passing explicitly.
+
+## 5. `Climb.pitches` is empty, and `length` is the only pitch signal
+
+`Climb.pitches` is typed as `[Pitch]` with a `pitchNumber` on each, and returns `[]` on every climb
+checked. The Apron, `17a692c8-9e34-5511-90e7-44ef23d10fa1`, returns 51 climbs and **not one has pitch
+data** — including Diedre, which is six pitches.
+
+`content.description` is empty on all of them too, so there is no text to parse for "5 pitches"
+either.
+
+That leaves `length`, in metres, which separates cleanly for Squamish trad:
+
+| Length | Reading |
+| ------ | ------- |
+| 15, 23, 27, 30, 36, 45 | single pitch |
+| 61, 70, 76, 91, 115, 121, 152, 182, 250 | multi-pitch |
+
+The multi-pitch values are 200/300/400/500 ft imports, and a rope length sits in the gap, so
+`find_climbs` treats 60 m and above as multi-pitch.
+
+The catch is that **9 of 59 trad climbs report `length: -1`**, Diedre among them — the signal is
+missing exactly where it is most wanted. So the tool reports three values, `yes`/`no`/`unknown`, and
+`unknown` survives a multi-pitch filter rather than being read as single pitch.
+
+## 6. YDS grades are frequently imprecise
+
+Across four Squamish areas, 30 distinct `grades.yds` values over 59 climbs. Most are exact (`5.9`,
+`5.10c`), but a meaningful minority are not:
+
+- **Bare numbers** — `5.10`, `5.12`. The letter was never recorded, so the route could be anywhere in
+  `a`–`d`.
+- **Slashes** — `5.11a/b`, `5.12a/b`.
+- **Modifiers** — `5.9+`, `5.8-`, `5.10-`, `5.12+`.
+
+`internal/grade` parses each into the span it covers and matches ranges by overlap, so a route
+recorded as `5.10` is returned for a 5.8–5.10b search. `+`/`-` order routes within a number rather
+than crossing into the next, and the scale has no letters below 5.10, so `5.9+` is exactly 5.9.
+
+## 7. Endpoint and error shapes
 
 - The endpoint is `https://api.openbeta.io/graphql`. The bare origin answers trivial queries but
   returns a plain-text `error code: 502` for larger ones.
@@ -95,7 +159,7 @@ Out of scope for the two-tool POC, but a future proximity tool would not need to
 - Malformed queries can return a non-JSON body, so status is checked before parsing.
 - `area(uuid:)` returns `data.area: null` for an unknown UUID rather than an error.
 
-## 6. Schema details worth recording
+## 8. Schema details worth recording
 
 `SearchWithinFilter` types `bbox` as a bare `[Float]`, so a transposed pair is not caught upstream.
 Order is `[minLng, minLat, maxLng, maxLat]` — longitude first. `BBox.Validate` catches the common
@@ -106,7 +170,7 @@ lat/lng transposition via the coordinate range check.
 
 `GradeType` carries `vscale`, `yds`, `ewbank`, `french`, `brazilianCrux`, `font`, `uiaa`, `wi`.
 
-## 7. Missing values are encoded in-band, not as null
+## 9. Missing values are encoded in-band, not as null
 
 `Climb` uses placeholder values rather than nulls where data is absent:
 

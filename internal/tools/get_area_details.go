@@ -15,9 +15,9 @@ type GetAreaDetailsArgs struct {
 	AreaID string `json:"areaId" jsonschema:"The area's UUID, in 8-4-4-4-12 hex form. Obtain one from a crags_within result or from an earlier get_area_details children list."`
 }
 
-func HandleGetAreaDetails(gql *graphql.Client) mcp.ToolHandlerFor[GetAreaDetailsArgs, generated.GetAreaDetailsResponse] {
+func HandleGetAreaDetails(gql graphql.Client) mcp.ToolHandlerFor[GetAreaDetailsArgs, generated.GetAreaDetailsResponse] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, args GetAreaDetailsArgs) (*mcp.CallToolResult, generated.GetAreaDetailsResponse, error) {
-		out, err := getAreaDetails(ctx, *gql, args)
+		out, err := getAreaDetails(ctx, gql, args)
 		return nil, out, err
 	}
 }

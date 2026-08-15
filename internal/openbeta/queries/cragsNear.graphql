@@ -1,0 +1,23 @@
+# placeId is not selected and not sent: the resolver echoes it back untouched as
+# an Apollo cache key, so lnglat is the only input that selects anything.
+#
+# climbs and children are not selected either — cragsNear returns them empty on
+# every result (docs/graphql-findings.md §4), so they cost latency and buy
+# nothing. Climb counts come from a GetAreaDetails call per crag.
+query CragsNear($lnglat: Point, $maxDistance: Int) {
+  cragsNear(lnglat: $lnglat, maxDistance: $maxDistance, includeCrags: true) {
+    count
+    crags {
+      uuid
+      areaName
+      totalClimbs
+      pathTokens
+      metadata {
+        lat
+        lng
+        leaf
+        isBoulder
+      }
+    }
+  }
+}
