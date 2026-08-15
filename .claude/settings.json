@@ -14,7 +14,8 @@
       "Bash(OPENBETA_LIVE=1 go test ./internal/openbeta -run 'TestLiveCragsNear$' -v -timeout 600s)",
       "Bash(git add *)",
       "Bash(git rev-list *)",
-      "Bash(gh pr *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr view *)",
       "Bash(git fetch *)"
     ]
   }
