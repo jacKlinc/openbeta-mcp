@@ -19,6 +19,24 @@ type Point struct {
 	Lng float64 `json:"lng"`
 }
 
+// NewPoint builds a Point, rejecting coordinates outside the globe.
+//
+// Validation lives here rather than at each call site because every coordinate
+// the server handles ends up as a Point, and an out-of-range value is the
+// symptom of a transposed pair far more often than of a genuinely absurd
+// coordinate — latitude only reaches 90, so a longitude in the latitude slot
+// usually lands outside it. Callers taking coordinates as an ordered array own
+// the message about ordering; this owns the range.
+func NewPoint(lat, lng float64) (Point, error) {
+	if lng < -180 || lng > 180 {
+		return Point{}, fmt.Errorf("longitude out of range: got %g, must be within [-180, 180]", lng)
+	}
+	if lat < -90 || lat > 90 {
+		return Point{}, fmt.Errorf("latitude out of range: got %g, must be within [-90, 90]", lat)
+	}
+	return Point{Lat: lat, Lng: lng}, nil
+}
+
 // Resolver turns a place name into coordinates.
 //
 // One implementation today, Gazetteer. A geocoder for the long tail goes behind

@@ -3,6 +3,7 @@ package geo
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -55,5 +56,42 @@ func TestHaversine(t *testing.T) {
 	}
 	if d := Haversine(squamish, squamish); d != 0 {
 		t.Errorf("distance to itself = %v, want 0", d)
+	}
+}
+
+// The range check moved here from the tools package, so the rejection cases live
+// with it. A transposed pair is the mistake this catches in practice: latitude
+// stops at 90, so a longitude in that slot usually falls outside.
+func TestNewPoint(t *testing.T) {
+	tests := []struct {
+		name    string
+		lat     float64
+		lng     float64
+		wantErr string
+	}{
+		{name: "Squamish", lat: 49.7016, lng: -123.1558},
+		{name: "null island", lat: 0, lng: 0},
+		{name: "transposed", lat: -123.1558, lng: 49.7016, wantErr: "latitude out of range"},
+		{name: "longitude too far east", lat: 0, lng: 181, wantErr: "longitude out of range"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewPoint(tt.lat, tt.lng)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("NewPoint(%g, %g) = %+v, want an error", tt.lat, tt.lng, got)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("error %q does not explain the problem (want %q)", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("NewPoint(%g, %g): %v", tt.lat, tt.lng, err)
+			}
+			if got.Lat != tt.lat || got.Lng != tt.lng {
+				t.Errorf("NewPoint(%g, %g) = %+v", tt.lat, tt.lng, got)
+			}
+		})
 	}
 }

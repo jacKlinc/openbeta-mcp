@@ -114,15 +114,14 @@ func resolveOrigin(ctx context.Context, resolver geo.Resolver, args CragsNearArg
 			return ResolvedPlace{}, fmt.Errorf("lnglat must have exactly 2 elements [longitude, latitude], got %d", len(args.LngLat))
 		}
 		lng, lat := args.LngLat[0], args.LngLat[1]
-		// The same transposition guard the bbox validation used: longitude
-		// first, and a swapped pair usually lands out of range.
-		if lng < -180 || lng > 180 {
-			return ResolvedPlace{}, fmt.Errorf("longitude out of range: got %g, must be within [-180, 180]; order is [longitude, latitude]", lng)
+		// geo owns the range check; the ordering hint belongs here, because the
+		// order only exists in this tool's array argument and a transposed pair
+		// is the mistake it invites.
+		p, err := geo.NewPoint(lat, lng)
+		if err != nil {
+			return ResolvedPlace{}, fmt.Errorf("%w; order is [longitude, latitude]", err)
 		}
-		if lat < -90 || lat > 90 {
-			return ResolvedPlace{}, fmt.Errorf("latitude out of range: got %g, must be within [-90, 90]; order is [longitude, latitude]", lat)
-		}
-		return ResolvedPlace{Lat: lat, Lng: lng, Source: "caller"}, nil
+		return ResolvedPlace{Lat: p.Lat, Lng: p.Lng, Source: "caller"}, nil
 	default:
 		p, err := resolver.Resolve(ctx, args.Place)
 		if err != nil {
