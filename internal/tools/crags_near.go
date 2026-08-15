@@ -237,9 +237,9 @@ func distanceKm(origin geo.Point, a CragsNearCrag) float64 {
 }
 
 // adapter: MCP signature, no logic
-func HandleCragsNear(gql *graphql.Client, resolver geo.Resolver) mcp.ToolHandlerFor[CragsNearArgs, CragsNearResult] {
+func HandleCragsNear(gql graphql.Client, resolver geo.Resolver) mcp.ToolHandlerFor[CragsNearArgs, CragsNearResult] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, args CragsNearArgs) (*mcp.CallToolResult, CragsNearResult, error) {
-		out, err := cragsNear(ctx, *gql, resolver, args)
+		out, err := cragsNear(ctx, gql, resolver, args)
 		return nil, out, err
 	}
 }

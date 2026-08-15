@@ -18,7 +18,7 @@ import (
 // `go test ./...` stays offline and deterministic.
 //
 //	OPENBETA_LIVE=1 go test ./internal/openbeta -run Live -v
-func liveClient(t *testing.T) (*openbeta.Client, context.Context, *graphql.Client) {
+func liveClient(t *testing.T) (*openbeta.Client, context.Context, graphql.Client) {
 	t.Helper()
 	if os.Getenv("OPENBETA_LIVE") == "" {
 		t.Skip("set OPENBETA_LIVE=1 to run tests against the live API")
@@ -28,7 +28,7 @@ func liveClient(t *testing.T) (*openbeta.Client, context.Context, *graphql.Clien
 	c := openbeta.New()
 	gql := graphql.NewClient(c.Endpoint(), c.HTTPClient())
 
-	return c, ctx, &gql
+	return c, ctx, gql
 }
 
 // stawamusChief is a stable, well-populated area used as the verification

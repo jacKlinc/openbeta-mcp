@@ -20,7 +20,7 @@ import (
 //
 // Returning an error from detailFor produces a GraphQL error for that uuid,
 // which is how a partial upstream failure is simulated.
-func routingStub(t *testing.T, nearBody string, detailFor func(uuid string) (body string, fail bool)) (*graphql.Client, *atomic.Bool) {
+func routingStub(t *testing.T, nearBody string, detailFor func(uuid string) (body string, fail bool)) (graphql.Client, *atomic.Bool) {
 	t.Helper()
 
 	// atomic because the fan-out issues several requests at once, so the
@@ -47,8 +47,7 @@ func routingStub(t *testing.T, nearBody string, detailFor func(uuid string) (bod
 	}))
 	t.Cleanup(srv.Close)
 
-	c := graphql.NewClient(srv.URL, srv.Client())
-	return &c, &called
+	return graphql.NewClient(srv.URL, srv.Client()), &called
 }
 
 // uuidFromRequest pulls the uuid variable out of the raw request body. Crude,

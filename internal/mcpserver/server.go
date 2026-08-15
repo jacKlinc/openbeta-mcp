@@ -39,7 +39,7 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 			"distance and climb count, largest first, and only crags that actually hold " +
 			"climbs. Use this to answer 'what can I climb near here', then pass a returned " +
 			"uuid to get_area_details for the routes.",
-	}, tools.HandleCragsNear(&gqlClient, geo.NewGazetteer()))
+	}, tools.HandleCragsNear(gqlClient, geo.NewGazetteer()))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "find_climbs",
@@ -53,7 +53,7 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 			"'unknown' means the length was never recorded, not that the route is single " +
 			"pitch. 'cragsScanned' tells you how many crags were searched, so no results " +
 			"with a non-zero scan means the area genuinely holds nothing matching.",
-	}, tools.HandleFindClimbs(&gqlClient, geo.NewGazetteer()))
+	}, tools.HandleFindClimbs(gqlClient, geo.NewGazetteer()))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "get_area_details",
@@ -63,7 +63,7 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 			"you descend through them to reach the routes. An empty climbs list with a " +
 			"populated children list means the routes are one level down, not that the area " +
 			"is empty.",
-	}, tools.HandleGetAreaDetails(&gqlClient))
+	}, tools.HandleGetAreaDetails(gqlClient))
 
 	return server
 }

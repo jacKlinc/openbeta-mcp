@@ -15,7 +15,7 @@ import (
 // upstream was called at all. The genqlient client is real — only the transport
 // is stubbed — so response decoding is exercised, which is where a schema or
 // field-name mismatch would actually bite.
-func stubClient(t *testing.T, status int, body string) (*graphql.Client, *bool) {
+func stubClient(t *testing.T, status int, body string) (graphql.Client, *bool) {
 	t.Helper()
 
 	var called bool
@@ -27,8 +27,7 @@ func stubClient(t *testing.T, status int, body string) (*graphql.Client, *bool) 
 	}))
 	t.Cleanup(srv.Close)
 
-	c := graphql.NewClient(srv.URL, srv.Client())
-	return &c, &called
+	return graphql.NewClient(srv.URL, srv.Client()), &called
 }
 
 // Bad UUIDs are rejected locally: upstream answers "area Invalid UUID.", which

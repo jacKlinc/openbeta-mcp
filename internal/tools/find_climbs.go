@@ -255,9 +255,9 @@ func (a FindClimbsArgs) toCragsNearArgs() CragsNearArgs {
 }
 
 // adapter: MCP signature, no logic
-func HandleFindClimbs(gql *graphql.Client, resolver geo.Resolver) mcp.ToolHandlerFor[FindClimbsArgs, FindClimbsResult] {
+func HandleFindClimbs(gql graphql.Client, resolver geo.Resolver) mcp.ToolHandlerFor[FindClimbsArgs, FindClimbsResult] {
 	return func(ctx context.Context, _ *mcp.CallToolRequest, args FindClimbsArgs) (*mcp.CallToolResult, FindClimbsResult, error) {
-		out, err := findClimbs(ctx, *gql, resolver, args)
+		out, err := findClimbs(ctx, gql, resolver, args)
 		return nil, out, err
 	}
 }
