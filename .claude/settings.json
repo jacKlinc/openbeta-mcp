@@ -6,13 +6,11 @@
       "Bash(python3 -c ' *)",
       "Bash(curl -s -m 25 -w \"\\\\nHTTP %{http_code} in %{time_total}s\\\\n\" -X POST \"https://api.openbeta.io/graphql\" -H 'Content-Type: application/json' -d '{\"query\":\"{areas\\(filter:{area_name:{match:\\\\\"Smith Rock\\\\\"}}\\){area_name uuid totalClimbs}}\"}')",
       "Bash(uv add *)",
-      // Go
       "Bash(gofmt -l internal/)",
       "Bash(OPENBETA_LIVE=1 go test ./internal/openbeta -run *)",
       "Bash(go fmt *)",
       "Bash(PYENV_VERSION=system python3 -)",
       "Bash(gofmt -w internal/tools/)",
-      // Git
       "Bash(git add *)",
       "Bash(git rev-list *)",
       "Bash(gh run *)",
