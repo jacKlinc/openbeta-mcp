@@ -6,6 +6,10 @@
 package mcpserver
 
 import (
+	"context"
+	"log"
+	"sync/atomic"
+
 	"github.com/Khan/genqlient/graphql"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -65,5 +69,19 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 			"is empty.",
 	}, tools.HandleGetAreaDetails(gqlClient))
 
+	// Count number of round trips each tool makes
+	server.AddReceivingMiddleware(func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			// CallToolParamsRaw allows metadata to be added to the responses
+			toolParams, ok := req.GetParams().(*mcp.CallToolParamsRaw)
+			if !ok {
+				return next(ctx, method, req)
+			}
+			var n atomic.Int32
+			res, err := next(openbeta.WithCounter(ctx, &n), method, req)
+			log.Printf("tool=%s, roundtrips=%d", toolParams.Name, n.Load())
+			return res, err
+		}
+	})
 	return server
 }
