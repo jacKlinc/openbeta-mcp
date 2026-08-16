@@ -7,8 +7,8 @@ package mcpserver
 
 import (
 	"context"
-	"log"
 	"sync/atomic"
+	"time"
 
 	"github.com/Khan/genqlient/graphql"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -78,9 +78,21 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 				return next(ctx, method, req)
 			}
 			var n atomic.Int32
-			res, err := next(openbeta.WithCounter(ctx, &n), method, req)
-			log.Printf("tool=%s, roundtrips=%d", toolParams.Name, n.Load())
-			return res, err
+			start := time.Now()
+			res, callErr := next(openbeta.WithCounter(ctx, &n), method, req)
+			// Read before the sink runs, so its syscalls stay out of the sample.
+			elapsed := time.Since(start)
+
+			// A tool that rejects its input reports the failure in the result,
+			// not as a Go error, so callErr alone recorded every validation
+			// rejection as a success.
+			failed := callErr != nil
+			if out, ok := res.(*mcp.CallToolResult); ok && out.IsError {
+				failed = true
+			}
+
+			recordCall(toolParams.Name, start, elapsed, n.Load(), failed)
+			return res, callErr
 		}
 	})
 	return server
