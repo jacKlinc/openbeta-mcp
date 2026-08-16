@@ -91,7 +91,7 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 				failed = true
 			}
 
-			recordCall(toolParams.Name, start, elapsed, n.Load(), failed)
+			recordCall(toolParams.Name, toolParams.Arguments, start, elapsed, n.Load(), failed)
 			return res, callErr
 		}
 	})
