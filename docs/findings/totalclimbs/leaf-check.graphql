@@ -1,0 +1,36 @@
+# Does a leaf area's totalClimbs match the climbs it actually holds?
+#
+# Endpoint: https://api.openbeta.io/graphql
+# Paste into https://graphiql-online.com — no login, no toolchain.
+#
+# Grand Wall Boulders is a parent whose children are almost all leaves, so one
+# request gives 18 leaf areas to compare. For each child, totalClimbs should
+# equal the number of entries in climbs.
+#
+# Observed 2026-08-17: 7 of the 18 report totalClimbs: 0 while returning
+# between 3 and 7 climbs each. The other 11 match exactly.
+
+query LeafCheck {
+  areas(
+    filter: { area_name: { match: "Grand Wall Boulders", exactMatch: true } }
+    limit: 5
+  ) {
+    uuid
+    areaName
+    totalClimbs
+    pathTokens
+    metadata {
+      leaf
+    }
+    children {
+      areaName
+      totalClimbs
+      metadata {
+        leaf
+      }
+      climbs {
+        uuid
+      }
+    }
+  }
+}

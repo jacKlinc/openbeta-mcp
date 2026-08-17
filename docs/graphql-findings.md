@@ -41,6 +41,14 @@ Hence `climbCount` in [crags_near.go](../internal/tools/crags_near.go): prefer
 The cost is requesting `climbs { uuid }` inside `cragsWithin`, which takes the query from ~130ms to
 ~1.2s. `cragsWithin` returns `[Area]`, so this is one round trip, not N+1.
 
+**Root cause, and how far it reaches:** [findings/totalclimbs/](findings/totalclimbs/) takes this
+apart. The rollup arithmetic is exact and the read path is fine; the leaf values were never set by
+a 2023 import of non-USA areas. Every USA area measured is perfect, every Canadian one is not —
+British Columbia reports 1052 climbs against 8711 real ones. Nothing created from 2024 onward is
+affected, so this is stale data from a known batch rather than an ongoing fault, and it will not
+grow. That directory holds standalone `.graphql` files and a crawler for reproducing it without
+this repo, and is the citable artifact for an upstream issue.
+
 ## 2. `zoom` selects hierarchy depth, with a hard cutover at 11
 
 Same bbox, varying zoom:
