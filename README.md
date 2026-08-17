@@ -34,6 +34,12 @@ That produces a single binary with no runtime dependencies. There is no API key 
 configure — the OpenBeta API is public and read-only. `-endpoint` overrides the GraphQL URL and
 `-version` prints the build version; neither is needed for normal use.
 
+The endpoint can also come from `OPENBETA_ENDPOINT`, which is convenient for pointing the server at
+a local [openbeta-graphql](https://github.com/OpenBeta/openbeta-graphql) stack. Precedence is
+`-endpoint` > `OPENBETA_ENDPOINT` > the public API, and leaving both unset is always valid. The
+startup line on stderr names the endpoint actually in use, which is worth reading before believing
+any measurement.
+
 Point an MCP client at the binary using an **absolute path** — clients don't necessarily run with
 the working directory you'd expect.
 
