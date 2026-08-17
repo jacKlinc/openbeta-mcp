@@ -2,21 +2,22 @@
   "permissions": {
     "allow": [
       "Bash(ps -eo pid,etime,cmd)",
-      "Bash(grep -i \"[o]penbeta-mcp$\")",
+      "Bash(grep *)",
       "Bash(python3 -c ' *)",
       "Bash(curl -s -m 25 -w \"\\\\nHTTP %{http_code} in %{time_total}s\\\\n\" -X POST \"https://api.openbeta.io/graphql\" -H 'Content-Type: application/json' -d '{\"query\":\"{areas\\(filter:{area_name:{match:\\\\\"Smith Rock\\\\\"}}\\){area_name uuid totalClimbs}}\"}')",
+      "Bash(uv add *)",
       "Bash(gofmt -l internal/)",
-      "Bash(OPENBETA_LIVE=1 go test ./internal/openbeta -run TestLiveCragsWithinKeepsZeroTotalClimbsCrags -v)",
-      "Bash(gh run *)",
+      "Bash(OPENBETA_LIVE=1 go test ./internal/openbeta -run *)",
       "Bash(go fmt *)",
       "Bash(PYENV_VERSION=system python3 -)",
       "Bash(gofmt -w internal/tools/)",
-      "Bash(OPENBETA_LIVE=1 go test ./internal/openbeta -run 'TestLiveCragsNear$' -v -timeout 600s)",
       "Bash(git add *)",
       "Bash(git rev-list *)",
+      "Bash(gh run *)",
       "Bash(gh pr create *)",
       "Bash(gh pr view *)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "mcp__openbeta__*"
     ]
   }
 }

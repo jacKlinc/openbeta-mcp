@@ -54,5 +54,9 @@ func New(opts ...Option) *Client {
 	for _, o := range opts {
 		o(c)
 	}
+	// Wrapped after the options run, not before: WithHTTPClient replaces the whole
+	// *http.Client, so installing the counter in the literal above lets that option
+	// silently drop it. Note this mutates a caller-supplied client.
+	c.http.Transport = &CountTransport{Wrapped: c.http.Transport}
 	return c
 }

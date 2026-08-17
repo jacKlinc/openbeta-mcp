@@ -31,3 +31,19 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Round-trip measurements. Ad-hoc local runs are ignored; the curated dataset
+# under data/round-trip is tracked, because every published number references a
+# commit and has to be checkable against the file that recorded it.
+#
+# Listed file-by-file rather than as `!data/round-trip/`: git will not descend
+# into an excluded directory, so the directory has to be re-included before
+# anything inside it can be.
+data/*
+!data/round-trip/
+data/round-trip/*
+!data/round-trip/data.jsonl
+!data/round-trip/README.md
+
+# Python virtualenv for the eval harness
+evals/.venv/

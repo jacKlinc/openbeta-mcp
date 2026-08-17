@@ -2,6 +2,14 @@
 
 Design note. Not yet implemented.
 
+> **Turn the VPN off before running anything against the live API.**
+>
+> `api.openbeta.io` sits behind Cloudflare, which treats VPN exit nodes as suspect and challenges
+> or drops the request. The symptoms are the same three shapes catalogued below — dropped
+> connections, 502s, 503 HTML — so a VPN reads as upstream flakiness rather than as a local
+> configuration problem, and no amount of retrying fixes it. Check this first when live tests,
+> `scripts/bench.sh` or a manual query start failing in a way that looks transient.
+
 ## Why
 
 `api.openbeta.io` sits behind Cloudflare and fails transiently. Three shapes observed in one

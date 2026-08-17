@@ -39,6 +39,12 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      # The benchmark harness is behind //go:build bench, so nothing else in CI
+      # compiles it and it would rot unnoticed. vet type-checks without running,
+      # so the live API is untouched.
+      - name: go vet (bench harness)
+        run: go vet -tags bench ./internal/mcpserver
+
       - name: build
         run: go build ./...
 
