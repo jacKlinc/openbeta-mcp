@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -12,7 +13,7 @@ from typing import Any
 
 from mcp.types import CallToolResult
 
-from common import jsonl, stamp
+from common import jsonl
 from common.client import mcp_session, text_of
 from common.tokenizer import ENCODING, count
 from tokens.corpus import args_sha, build
@@ -23,12 +24,25 @@ REPO_ROOT = Path(__file__).parents[2]
 DEFAULT_OUT = REPO_ROOT / "data" / "tokens" / "data.jsonl"
 DEFAULT_CACHE = REPO_ROOT / "data" / "tokens" / "cache"
 
-# Row schema version, matching the Go sink's sampleVersion. Still 0: unreleased,
-# still free to change.
-ROW_VERSION = 0
+# Row schema version, matching the Go sink's sampleVersion. One since the commit
+# stamp came out; v0 rows carry commit and dirty fields that v1 does not.
+ROW_VERSION = 1
+
+# Pins the run id, so the harness and the server's own sink label the same calls
+# as one experiment. The runner script sets it.
+RUN_ENV = "OPENBETA_RUN"
 
 
-def row(tool: str, args: dict[str, Any], text: str, err: bool, run: str, commit: str, dirty: bool) -> dict:
+def run_id() -> str:
+    """Identifier shared by every row of one sweep.
+
+    A UTC timestamp rather than a commit: it sorts, it needs no git call, and
+    MLflow tags the export with the commit anyway.
+    """
+    return os.environ.get(RUN_ENV) or f"tok-{datetime.now(UTC):%Y%m%dT%H%M%SZ}"
+
+
+def row(tool: str, args: dict[str, Any], text: str, err: bool, run: str) -> dict:
     """One dataset row for one call.
 
     Field names match the server's own sink (internal/mcpserver/metrics.go), so
@@ -45,8 +59,6 @@ def row(tool: str, args: dict[str, Any], text: str, err: bool, run: str, commit:
         "chars": len(text),
         "err": err,
         "encoding": ENCODING,
-        "commit": commit,
-        "dirty": dirty,
     }
 
 
@@ -65,8 +77,8 @@ async def sweep(
     so calls are serial and paced.
     """
     corpus = build()
-    run, commit, dirty = stamp.run_id(), stamp.commit(), stamp.dirty()
-    logger.info("run %s at commit %s%s", run, commit[:7], " (dirty)" if dirty else "")
+    run = run_id()
+    logger.info("run %s", run)
 
     cache.mkdir(parents=True, exist_ok=True)
     written = 0
@@ -94,7 +106,7 @@ async def sweep(
                     cached.write_text(json.dumps({"tool": tool, "args": args, "text": text, "err": err}))
                     await asyncio.sleep(delay)
 
-                record = row(tool, args, text, err, run, commit, dirty)
+                record = row(tool, args, text, err, run)
                 jsonl.append(out, record)
                 written += 1
                 logger.info(
