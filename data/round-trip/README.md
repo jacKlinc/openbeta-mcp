@@ -153,16 +153,19 @@ Rediscover the children with `get_area_details` on the Chief.
 
 ## Analysis
 
+From [evals/](../../evals), so the package and its venv resolve:
+
 ```
-python3 evals/analysis/roundtrips.py data/round-trip/data.jsonl
-python3 evals/analysis/roundtrips.py --by commit data/round-trip/data.jsonl
-python3 evals/analysis/roundtrips.py --json data/round-trip/data.jsonl
+uv run python -m roundtrip.analysis ../data/round-trip/data.jsonl
+uv run python -m roundtrip.analysis --by run ../data/round-trip/data.jsonl
+uv run python -m roundtrip.analysis --json ../data/round-trip/data.jsonl
 ```
 
-Standard library only. Samples with `dirty: true` are excluded by default and the
-count of exclusions is printed; `--include-dirty` overrides. Percentiles are
-interpolated (`statistics.quantiles`, inclusive), so on small groups a p95 falls
-between the top two observations.
+Samples with `dirty: true` are excluded by default and the count of exclusions is
+printed; `--include-dirty` overrides. Percentiles are interpolated (pandas'
+default linear method), so on small groups a p95 falls between the top two
+observations. `--by run` summarises whole invocations — coverage and wall clock
+rather than a latency tail.
 
 ## Confounds
 
