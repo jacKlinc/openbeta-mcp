@@ -126,19 +126,20 @@ compiles them:
 scripts/bench.sh
 ```
 
-It requires a clean tree, because the commit stamped into each sample has to describe the code that
-ran. Results, methodology and confounds live in [data/round-trip/README.md](data/round-trip/README.md).
+Results, methodology and confounds live in [data/round-trip/README.md](data/round-trip/README.md).
 
 What a tool result costs a model to read is measured separately, by a Python harness that drives the
 built binary over stdio the way a real client does:
 
 ```bash
+uv run --project evals mlflow server --port 5000   # tracking server, once
 scripts/tokens.sh
 ```
 
-It sweeps every gazetteer place at three radii and every crawled area, and writes a token
-distribution with plots to [data/tokens/README.md](data/tokens/README.md). The harness itself is
-documented in [evals/README.md](evals/README.md).
+It sweeps every gazetteer place at three radii and every crawled area, writing the token
+distribution to [data/tokens/README.md](data/tokens/README.md). Both scripts write JSONL first and
+push to MLflow second, so the datasets stand on their own and the tracking server is a view over
+them. The harness itself is documented in [evals/README.md](evals/README.md).
 
 ### The GraphQL layer
 

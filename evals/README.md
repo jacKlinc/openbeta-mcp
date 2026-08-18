@@ -3,33 +3,43 @@
 Harness for measuring what the openbeta MCP server costs a model.
 
 Every eval gets a folder. `common/` is the plumbing they share — the stdio
-session, the commit stamp, JSONL reading and writing.
+session, the tokenizer, dataset io, and the MLflow export.
 
 ```
-common/     session, provenance, dataset io
+common/     session, tokenizer, dataset io, export
 tokens/     what a tool result costs to read
-roundtrip/  what a tool call costs in latency and HTTP round trips
 judge/      next up
 corpus/     the argument sets a sweep runs over, committed
 ```
 
-Everything runs as a module from this directory, so the packages resolve:
+**JSONL is the source of truth; MLflow is a view over it.** Every sweep writes its
+dataset to disk first and exports second, so a run survives the tracking server
+being down, moved or rebuilt — and the datasets stay readable by anything that can
+read a line of JSON.
+
+Start the tracking server before a sweep:
+
+```bash
+uv run mlflow server --port 5000
+```
+
+Everything else runs as a module from this directory, so the packages resolve:
 
 ```bash
 uv run python -m tokens.sweep --limit 5     # measure, live
-uv run python -m tokens.analysis ../data/tokens/data.jsonl
+uv run python -m common.export ../data/tokens/data.jsonl
 ```
 
 ## Token sweep
 
 ```bash
-go build -buildvcs=true -o openbeta-mcp ./cmd/openbeta-mcp   # the harness talks to this
-scripts/tokens.sh                                            # from the repo root
+go build -o openbeta-mcp ./cmd/openbeta-mcp   # the harness talks to this
+scripts/tokens.sh                             # from the repo root
 ```
 
-`scripts/tokens.sh` refuses to run on a dirty tree, builds a stamped binary,
-sweeps the whole corpus, and writes two datasets plus the plots. Results and
-confounds are in [../data/tokens/README.md](../data/tokens/README.md).
+`scripts/tokens.sh` builds the binary, sweeps the whole corpus, writes both
+datasets, and pushes them to MLflow. Results and confounds are in
+[../data/tokens/README.md](../data/tokens/README.md).
 
 A tool result is deterministic for its arguments, so calling one twice adds
 nothing. **The spread comes from the breadth of the corpus, not from repetition**
@@ -44,17 +54,28 @@ rather than looping over five fixed queries.
 | `python -m tokens.sweep` | measure every argument set, append rows, cache payloads |
 | `python -m tokens.sweep --use-cache` | re-count from cached payloads, no live calls |
 | `python -m tokens.schema` | size of the tool definitions, resent every turn |
-| `python -m tokens.analysis <data.jsonl>` | table, plots, breaking point |
-| `python -m roundtrip.analysis <data.jsonl>` | latency and round trips, `--by tool\|run\|commit\|args_sha` |
+| `python -m common.export <data.jsonl>...` | push runs to MLflow; `--force` re-exports |
 
 Payloads are cached under `data/tokens/cache/` by `args_sha`, so changing the
-tokenizer or the analysis costs no upstream calls. The API is free and
-volunteer-run: calls are serial and paced.
+tokenizer costs no upstream calls. The API is free and volunteer-run: calls are
+serial and paced.
 
 Rows carry the same field names the server's own sink writes, and `args_sha` is
 computed exactly as Go computes it — same canonical JSON, same first 12 hex of
 the SHA-256 — so the token dataset and the round-trip dataset join on
-`(tool, args_sha)`.
+`(tool, args_sha)` and export as one MLflow run.
+
+## Reading a run
+
+Per-call values are logged as a metric series ordered by rank, so MLflow's own
+line chart draws the quantile curve — a flat shelf is a mode, the rise at the
+right is the tail. That is what replaced the plotting code the harness used to
+carry. The p50/p95/p99 scalars are what compare runs.
+
+MLflow keeps chart layouts in browser-side state, so a view built in the UI does
+not travel. `CHARTS` in [common/export.py](common/export.py) declares the intended
+charts and is logged to every run as `charts.json` — the reproducible record of
+which metrics form which chart.
 
 ## What the numbers are
 

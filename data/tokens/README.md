@@ -6,9 +6,9 @@ What a tool result costs a model to read, as a distribution rather than a single
 number. The question behind it: nothing recorded how large these payloads get,
 so "we should paginate" had no number attached to it.
 
-`data.jsonl` is the dataset, `roundtrips.jsonl` the HTTP cost of the same calls,
-`plots/` the figures. Every number below is derived from them and can be
-recomputed with the commands in [Analysis](#analysis).
+`data.jsonl` is the dataset and `roundtrips.jsonl` the HTTP cost of the same
+calls. Every number below is derived from them and can be recomputed from the run
+in MLflow — see [Analysis](#analysis).
 
 ## Results
 
@@ -57,14 +57,6 @@ is discarded by the distance sort and the cap.
 Across the whole dataset, 2.77 characters per token — well under the ~4 that
 prose averages, which is the JSON penalty the caveat below refers to.
 
-## Plots
-
-| File | Shows |
-| ---- | ----- |
-| [`plots/tokens-ecdf.png`](plots/tokens-ecdf.png) | all three tools; the fan-out bimodality is the flat shelf between the two risers |
-| [`plots/tokens-hist-*.png`](plots/) | per-tool histogram, log x, with p50/p95/p99 marked |
-| [`plots/tokens-vs-distance.png`](plots/tokens-vs-distance.png) | fan-out cost by radius — flat, for the reason given above |
-
 ## What a row is
 
 One MCP tool call, measured by the Python harness in
@@ -74,8 +66,8 @@ the text blocks of the result — what the model actually reads.
 
 | Field      | Meaning                                                                          |
 | ---------- | -------------------------------------------------------------------------------- |
-| `v`        | Schema version. `0` — unreleased, still free to change.                          |
-| `run`      | Groups rows from one sweep. `tok-<short sha>`, shared with `roundtrips.jsonl`.    |
+| `v`        | Schema version. `1` since the commit stamp came out; see below.                  |
+| `run`      | Groups rows from one sweep. `tok-<UTC timestamp>`, shared with `roundtrips.jsonl`. |
 | `ts`       | Call time, UTC.                                                                  |
 | `tool`     | Tool name.                                                                       |
 | `args`     | The arguments, verbatim, so the exact query can be re-run.                       |
@@ -84,8 +76,11 @@ the text blocks of the result — what the model actually reads.
 | `chars`    | Characters in the same text, so the tokens-per-char ratio stays checkable.       |
 | `err`      | Tool failed. Covers `isError` results and transport failures alike.              |
 | `encoding` | The tokenizer. `o200k_base` — OpenAI's, not Claude's. See the caveat below.      |
-| `commit`   | Commit of the working tree the sweep ran from.                                   |
-| `dirty`    | Tree had uncommitted changes. Excluded from published numbers.                   |
+
+The rows committed here are **v0**, and carry `commit` and `dirty` as well. Those
+fields are no longer written: MLflow tags each exported run with the commit it was
+exported from, so recording provenance here too was a second source of truth to
+keep in step. `v` tells the two shapes apart, and the exporter reads both.
 
 `roundtrips.jsonl` sits beside it: the same calls, recorded by the server's own
 sink, in the schema documented in [../round-trip/README.md](../round-trip/README.md).
@@ -126,8 +121,11 @@ resolve. The area list is committed at
 
 ## How to reproduce
 
-The tree must be **completely clean**, `git status --porcelain` empty — the same
-rule as the round-trip benchmark, and for the same reason.
+Start the tracking server first, since the sweep pushes to it when it finishes:
+
+```
+uv run --project evals mlflow server --port 5000
+```
 
 ```
 scripts/tokens.sh                    # full sweep, live
@@ -136,21 +134,28 @@ scripts/tokens.sh --use-cache        # re-count from cached payloads, no API cal
 ```
 
 Payloads are cached under `data/tokens/cache/` (gitignored) by `args_sha`, so
-re-counting after a tokenizer or analysis change costs nothing upstream. Turn the
-VPN off first — [retry.md](../../docs/retry.md) explains why.
+re-counting after a tokenizer change costs nothing upstream. Turn the VPN off
+first — [retry.md](../../docs/retry.md) explains why.
 
 ## Analysis
 
-From [evals/](../../evals):
+Both datasets are pushed to MLflow under one run, keyed by the `run` field:
 
 ```
-uv run python -m tokens.analysis ../data/tokens/data.jsonl
-uv run python -m tokens.analysis --by args_sha ../data/tokens/data.jsonl
-uv run python -m roundtrip.analysis ../data/tokens/roundtrips.jsonl
+uv run --project evals python -m common.export data/tokens/data.jsonl data/tokens/roundtrips.jsonl
 ```
 
-Rows with `dirty: true` are excluded by default; `--include-dirty` overrides.
-Figures are written to `plots/` unless `--no-plots` is given.
+`scripts/tokens.sh` runs this itself when it finishes, so this is only needed for a
+backfill or after the tracking server has been rebuilt. Exporting is idempotent —
+a run already present is skipped unless `--force` is given.
+
+In the UI, each tool's per-call values form a metric series ordered by rank
+(`tokens.<tool>`, `latency_ms.<tool>`, `http_roundtrips.<tool>`), which reads as a
+quantile curve: a flat shelf is a mode, the rise at the right is the tail. The
+bimodality described above is the long shelf at ~31 tokens. The p50/p95/p99 scalars
+are what compare one run against another, and `charts.json` in the run's artifacts
+declares the intended charts — MLflow keeps chart layouts in browser-side state, so
+the spec is what makes the view reproducible.
 
 ## Confounds
 
@@ -164,7 +169,8 @@ Figures are written to `plots/` unless `--no-plots` is given.
   server can resolve, weighted by nothing. Read the distribution as the shape of
   what the tools *can* return, not of what a user will ask for.
 - **Upstream is a moving target.** Crag and climb counts are user-contributed and
-  grow. `ts` and `commit` bound each sweep; the corpus pins the inputs.
+  grow. `ts` bounds each sweep and the corpus pins the inputs; the commit is
+  tagged on the MLflow run.
 - **One call failed on an upstream 502** — `find_climbs` at Fair Head, the
   transient Cloudflare shape catalogued in [retry.md](../../docs/retry.md). It is
   recorded with `err: true` and `tokens: 0`, and drags that tool's mean down
