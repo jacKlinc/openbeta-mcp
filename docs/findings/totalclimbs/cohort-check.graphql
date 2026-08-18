@@ -1,0 +1,42 @@
+# Which import cohort do the broken areas belong to?
+#
+# Endpoint: https://api.openbeta.io/graphql
+# Paste into https://graphiql-online.com — no login, no toolchain.
+#
+# The Malamute's children are all broken (totalClimbs: 0 while holding climbs).
+# This adds authorMetadata so the reported count sits next to when the area was
+# created. Compare against Grand Wall Boulders, whose children are a mix.
+#
+# Observed 2026-08-17: every broken leaf under British Columbia and Alberta was
+# created in 2023 — 1191 of 1191 and 354 of 354. USA areas were created in 2022
+# and are all correct. Nothing created in 2024 or later is broken.
+#
+# createdAt/updatedAt come back as epoch milliseconds.
+
+query CohortCheck {
+  areas(
+    filter: { area_name: { match: "The Malamute", exactMatch: true } }
+    limit: 5
+  ) {
+    areaName
+    totalClimbs
+    authorMetadata {
+      createdAt
+      updatedAt
+    }
+    children {
+      areaName
+      totalClimbs
+      metadata {
+        leaf
+      }
+      climbs {
+        uuid
+      }
+      authorMetadata {
+        createdAt
+        updatedAt
+      }
+    }
+  }
+}

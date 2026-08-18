@@ -34,6 +34,12 @@ That produces a single binary with no runtime dependencies. There is no API key 
 configure — the OpenBeta API is public and read-only. `-endpoint` overrides the GraphQL URL and
 `-version` prints the build version; neither is needed for normal use.
 
+The endpoint can also come from `OPENBETA_ENDPOINT`, which is convenient for pointing the server at
+a local [openbeta-graphql](https://github.com/OpenBeta/openbeta-graphql) stack. Precedence is
+`-endpoint` > `OPENBETA_ENDPOINT` > the public API, and leaving both unset is always valid. The
+startup line on stderr names the endpoint actually in use, which is worth reading before believing
+any measurement.
+
 Point an MCP client at the binary using an **absolute path** — clients don't necessarily run with
 the working directory you'd expect.
 
@@ -105,6 +111,23 @@ Tests against the live API are opt-in, so the default run is deterministic:
 ```bash
 OPENBETA_LIVE=1 go test -run Live -v ./internal/openbeta
 ```
+
+> **Turn the VPN off before any live run.** `api.openbeta.io` sits behind Cloudflare, which
+> challenges or drops traffic from VPN exit nodes. It surfaces as dropped connections, 502s and
+> 503 HTML pages — indistinguishable from upstream flakiness, and not fixable by retrying. See
+> [docs/retry.md](docs/retry.md).
+
+### Benchmarks
+
+Round-trip and latency measurements per tool, behind a `bench` build tag so nothing ordinary
+compiles them:
+
+```bash
+scripts/bench.sh
+```
+
+It requires a clean tree, because the commit stamped into each sample has to describe the code that
+ran. Results, methodology and confounds live in [data/round-trip/README.md](data/round-trip/README.md).
 
 ### The GraphQL layer
 
@@ -201,6 +224,8 @@ transport later is a change at the composition root rather than a fork of the ha
 - [cragsNear notes](docs/cragsNear/README.md) — why the proximity query needs a second call, and
   the shape that follows
 - [Retry policy](docs/retry.md) — design note on handling upstream 5xx, not yet implemented
+- [Round-trip measurements](data/round-trip/README.md) — what each tool costs upstream, and the
+  methodology behind the numbers
 - [Worked example](docs/examples/squamish.md) — both tools against the live API
 - [Functional requirements](docs/poc/functional-requirements.md) — what the server does
 - [Non-functional requirements](docs/poc/non-functional-requirements.md) — how it should behave
