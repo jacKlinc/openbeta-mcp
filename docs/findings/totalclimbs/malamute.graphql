@@ -1,0 +1,40 @@
+# Is The Malamute's totalClimbs: 0 real?
+#
+# Endpoint: https://api.openbeta.io/graphql
+# Paste into https://graphiql-online.com — no login, no toolchain.
+#
+# The Malamute is a well-known Squamish crag. It reports totalClimbs: 0. This
+# asks the area and its children in one request, so the reported count sits
+# next to the climbs that contradict it.
+#
+# Observed 2026-08-17: totalClimbs: 0 on the parent, and 0 on every one of its
+# 11 leaf children — which between them return 61 climbs.
+
+query MalamuteCheck {
+  areas(
+    filter: { area_name: { match: "The Malamute", exactMatch: true } }
+    limit: 5
+  ) {
+    uuid
+    areaName
+    totalClimbs
+    pathTokens
+    metadata {
+      leaf
+      isBoulder
+    }
+    climbs {
+      uuid
+    }
+    children {
+      areaName
+      totalClimbs
+      metadata {
+        leaf
+      }
+      climbs {
+        uuid
+      }
+    }
+  }
+}

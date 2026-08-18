@@ -14,10 +14,15 @@ import (
 	"github.com/jacKlinc/openbeta-mcp/internal/tools"
 )
 
-// Live tests hit the real API. Opt in with OPENBETA_LIVE=1 so the default
+// Live tests hit a real API. Opt in with OPENBETA_LIVE=1 so the default
 // `go test ./...` stays offline and deterministic.
 //
 //	OPENBETA_LIVE=1 go test ./internal/openbeta -run Live -v
+//
+// OPENBETA_ENDPOINT redirects them at a local stack instead of the public API,
+// which is a free service run by volunteers:
+//
+//	OPENBETA_LIVE=1 OPENBETA_ENDPOINT=http://localhost:4000 go test ./internal/openbeta -run Live -v
 func liveClient(t *testing.T) (*openbeta.Client, context.Context, graphql.Client) {
 	t.Helper()
 	if os.Getenv("OPENBETA_LIVE") == "" {
@@ -25,7 +30,15 @@ func liveClient(t *testing.T) (*openbeta.Client, context.Context, graphql.Client
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	t.Cleanup(cancel)
-	c := openbeta.New()
+
+	// Without this the tests silently talk to production no matter what the
+	// environment says, which makes a local run a lie.
+	var opts []openbeta.Option
+	if ep := os.Getenv("OPENBETA_ENDPOINT"); ep != "" {
+		opts = append(opts, openbeta.WithEndpoint(ep))
+	}
+	c := openbeta.New(opts...)
+	t.Logf("live endpoint: %s", c.Endpoint())
 	gql := graphql.NewClient(c.Endpoint(), c.HTTPClient())
 
 	return c, ctx, gql

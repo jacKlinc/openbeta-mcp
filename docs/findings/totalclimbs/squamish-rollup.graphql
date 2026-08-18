@@ -1,0 +1,34 @@
+# Does a parent's totalClimbs sum over its children?
+#
+# Endpoint: https://api.openbeta.io/graphql
+# Paste into https://graphiql-online.com — no login, no toolchain.
+#
+# This is the control. If the rollup arithmetic were broken, the parent value
+# would disagree with the sum over children. It does not.
+#
+# Observed 2026-08-17: Squamish reports 609, and its 31 children sum to exactly
+# 609 — 7 of them non-zero, 24 reporting 0. The Malamute is one of the zeros,
+# so the 61 climbs it holds (see malamute.graphql) are absent from the 609.
+#
+# The rollup is faithful. What it faithfully sums is wrong.
+
+query SquamishRollup {
+  areas(
+    filter: { area_name: { match: "Squamish", exactMatch: true } }
+    limit: 5
+  ) {
+    areaName
+    totalClimbs
+    pathTokens
+    metadata {
+      leaf
+    }
+    children {
+      areaName
+      totalClimbs
+      metadata {
+        leaf
+      }
+    }
+  }
+}

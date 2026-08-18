@@ -24,8 +24,26 @@ import (
 //	go build -ldflags "-X main.version=$(git describe --tags)" ./cmd/openbeta-mcp
 var version = "dev"
 
+// defaultEndpoint resolves the endpoint the -endpoint flag falls back to, so
+// precedence reads flag > OPENBETA_ENDPOINT > DefaultEndpoint.
+//
+// An env var rather than a dotenv file because that is how a stdio MCP server is
+// configured in the first place: the client config block passes `env` to the
+// subprocess, so this is the native mechanism and a .env would be a second,
+// redundant one. Resolution happens here at the composition root rather than in
+// internal/ — the client stays pure config and is handed a URL.
+//
+// Unset is always valid. `go install` then run with nothing set must keep
+// talking to production; that is the property worth protecting.
+func defaultEndpoint() string {
+	if v := os.Getenv("OPENBETA_ENDPOINT"); v != "" {
+		return v
+	}
+	return openbeta.DefaultEndpoint
+}
+
 func main() {
-	endpoint := flag.String("endpoint", openbeta.DefaultEndpoint, "OpenBeta GraphQL endpoint")
+	endpoint := flag.String("endpoint", defaultEndpoint(), "OpenBeta GraphQL endpoint (or set OPENBETA_ENDPOINT)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
