@@ -63,4 +63,7 @@ mkdir -p "$(dirname "$OUT")"
 cp "$TMP" "$OUT"
 echo "bench: $(wc -l <"$OUT") samples written to $OUT"
 
-python3 evals/analysis/roundtrips.py "$OUT" || true
+# Run from evals/ so the module resolves and picks up that project's venv; the
+# dataset path is made absolute first, since $OUT is relative to the repo root.
+OUT_ABS=$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")
+(cd evals && uv run python -m roundtrip.analysis "$OUT_ABS") || true
