@@ -31,6 +31,7 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+**/__pycache__/**
 
 # Round-trip measurements. Ad-hoc local runs are ignored; the curated dataset
 # under data/round-trip is tracked, because every published number references a
