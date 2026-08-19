@@ -17,4 +17,24 @@ dependencies = [
 dev = [
     "ipykernel>=6.30",
     "jupyterlab>=4.4",
+    "ruff>=0.14",
+]
+
+[tool.ruff]
+line-length = 120
+# Ruff lints notebooks by default. Exploration is not held to the modules'
+# standard: a path-setting first cell puts imports after statements, and a
+# scratch cell imports more than it ends up using.
+extend-exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = [
+    "F",   # pyflakes
+    "E",   # pycodestyle
+    "W",
+    "I",   # import order
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "SIM", # simplify
+    "RUF",
 ]
