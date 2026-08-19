@@ -2,13 +2,84 @@
 
 Harness for measuring what the openbeta MCP server costs a model.
 
-```bash
-cd harness
-uv run python tokens.py
+Every eval gets a folder. `common/` is the plumbing they share — the stdio
+session, the tokenizer, dataset io, and the MLflow export.
+
+```
+common/     session, tokenizer, dataset io, export
+tokens/     what a tool result costs to read
+judge/      next up
+corpus/     the argument sets a sweep runs over, committed
 ```
 
-It connects to the built binary over stdio, lists the tools, and reports the
-size of each tool's schema and of each tool's output.
+**JSONL is the source of truth; MLflow is a view over it.** Every sweep writes its
+dataset to disk first and exports second, so a run survives the tracking server
+being down, moved or rebuilt — and the datasets stay readable by anything that can
+read a line of JSON.
+
+Start the tracking server before a sweep:
+
+```bash
+uv run mlflow server --port 5000
+```
+
+Everything else runs as a module from this directory, so the packages resolve:
+
+```bash
+uv run python -m tokens.sweep --limit 5     # measure, live
+uv run python -m common.export ../data/tokens/data.jsonl
+```
+
+## Token sweep
+
+```bash
+go build -o openbeta-mcp ./cmd/openbeta-mcp   # the harness talks to this
+scripts/tokens.sh                             # from the repo root
+```
+
+`scripts/tokens.sh` builds the binary, sweeps the whole corpus, writes both
+datasets, and pushes them to MLflow. Results and confounds are in
+[../data/tokens/README.md](../data/tokens/README.md).
+
+A tool result is deterministic for its arguments, so calling one twice adds
+nothing. **The spread comes from the breadth of the corpus, not from repetition**
+— `n` is the number of argument sets, which is why `tokens/corpus.py` crosses
+every gazetteer place with three search radii and crawls the area hierarchy
+rather than looping over five fixed queries.
+
+| Command | What it does |
+|---|---|
+| `python -m tokens.corpus` | print the corpus sizes |
+| `python -m tokens.corpus --crawl` | rebuild `corpus/areas.json` from the live API |
+| `python -m tokens.sweep` | measure every argument set, append rows, cache payloads |
+| `python -m tokens.sweep --use-cache` | re-count from cached payloads, no live calls |
+| `python -m tokens.schema` | size of the tool definitions, resent every turn |
+| `python -m common.export <data.jsonl>...` | push runs to MLflow; `--force` re-exports |
+
+Payloads are cached under `data/tokens/cache/` by `args_sha`, so changing the
+tokenizer costs no upstream calls. The API is free and volunteer-run: calls are
+serial and paced.
+
+Rows carry the same field names the server's own sink writes, and `args_sha` is
+computed exactly as Go computes it — same canonical JSON, same first 12 hex of
+the SHA-256 — so the token dataset and the round-trip dataset join on
+`(tool, args_sha)` and export as one MLflow run.
+
+## Reading a run
+
+Per-call values are logged as a metric series ordered by rank, so MLflow's own
+line chart draws the quantile curve — a flat shelf is a mode, the rise at the
+right is the tail. That is the ECDF, transposed. The p50/p95/p99 scalars are
+what compare runs.
+
+MLflow keeps chart layouts in browser-side state, so a view built in the UI does
+not travel; [docs/charts.md](docs/charts.md) is the record of which metrics form
+which chart.
+
+The shapes MLflow has no form for — a histogram, cost against an argument — are
+figures in [common/plots.py](common/plots.py), written to be imported from a
+notebook. [docs/charts.md](docs/charts.md) covers both viewers and which one
+answers which question.
 
 ## What the numbers are
 
@@ -49,9 +120,10 @@ effects. The `usage` numbers are real; that attribution is not.
 
 ## Two costs, billed differently
 
-- **Tool output** is paid once, when the result comes back.
+- **Tool output** is paid once, when the result comes back. That is what
+  `tokens.sweep` measures.
 - **Tool schemas** are paid on every single turn, whether or not the tool is
   called. That standing rent is why adding a tool is never free, and it is the
   measurement behind the tool-shape decision in
   [../docs/gazzetteer/README.md](../docs/gazzetteer/README.md) — one folded tool
-  versus two separate ones.
+  versus two separate ones. `tokens.schema` reports it.

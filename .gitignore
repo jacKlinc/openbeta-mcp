@@ -46,5 +46,22 @@ data/round-trip/*
 !data/round-trip/data.jsonl
 !data/round-trip/README.md
 
+# Token measurements, same rule. The payload cache stays ignored: it is a few
+# megabytes of upstream responses, rebuildable, and only there so re-counting
+# costs no API calls.
+!data/tokens/
+data/tokens/*
+!data/tokens/data.jsonl
+!data/tokens/roundtrips.jsonl
+!data/tokens/README.md
+!data/tokens/plots/
+data/tokens/plots/*
+!data/tokens/plots/*.png
+
 # Python virtualenv for the eval harness
 evals/.venv/
+
+# MLflow local state
+mlruns/
+mlartifacts/
+mlflow.db

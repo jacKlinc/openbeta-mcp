@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -29,11 +28,11 @@ const runEnv = "OPENBETA_RUN"
 
 // sampleVersion stamps every record.
 //
-// Zero because the schema is unreleased: nothing that writes it has been merged,
-// so there is no compatibility to keep and no earlier shape to migrate from. The
-// field exists to give the first breaking change after it ships something to key
-// on.
-const sampleVersion = 0
+// One since the build stamp came out: v0 records carry commit, dirty and go,
+// which v1 does not. Provenance is MLflow's job now — it tags every run with the
+// commit of the tree the export ran from — so recording it here as well was a
+// second source of truth to keep in step.
+const sampleVersion = 1
 
 // sample is one measured tool call. Typed rather than a map so the field order
 // is declared and a mistyped key fails to compile instead of silently appearing
@@ -48,9 +47,6 @@ type sample struct {
 	Roundtrips int32           `json:"roundtrips"`
 	MS         float64         `json:"ms"`
 	Err        bool            `json:"err"`
-	Commit     string          `json:"commit"`
-	Dirty      bool            `json:"dirty"`
-	Go         string          `json:"go"`
 }
 
 // metricsMu serialises appends. Encode can issue several writes, so concurrent
@@ -62,42 +58,6 @@ var metricsMu sync.Mutex
 // relative path lands somewhere the operator did not pick — logging the
 // absolute path once makes that visible instead of silent.
 var metricsOnce sync.Once
-
-// stamp identifies the build that served a call.
-type stamp struct {
-	Commit string
-	Dirty  bool
-	Go     string
-}
-
-// buildStamp reads the VCS information the toolchain embeds at link time.
-//
-// The commit has to come from the binary rather than from `git rev-parse` at
-// analysis time: a running server can be built from a commit the working tree
-// has long since moved past, which is exactly what the pilot samples turned out
-// to be. Dirty is recorded rather than hidden — a hash from a modified tree does
-// not identify the code that ran.
-//
-// Commit is left empty when the binary carries no stamp. `go test` binaries are
-// test-only packages, which the default -buildvcs=auto excludes, so benchmarks
-// must pass -buildvcs=true; the bench gate refuses to run without it rather than
-// letting this silently record nothing.
-var buildStamp = sync.OnceValue(func() stamp {
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		return stamp{}
-	}
-	s := stamp{Go: info.GoVersion}
-	for _, setting := range info.Settings {
-		switch setting.Key {
-		case "vcs.revision":
-			s.Commit = setting.Value
-		case "vcs.modified":
-			s.Dirty = setting.Value == "true"
-		}
-	}
-	return s
-})
 
 // runID groups every sample from one process, so an interrupted run can be told
 // apart from a complete one after the fact.
@@ -164,7 +124,6 @@ func recordCall(tool string, args json.RawMessage, start time.Time, elapsed time
 	}
 	defer f.Close()
 
-	build := buildStamp()
 	if err := json.NewEncoder(f).Encode(sample{
 		V:          sampleVersion,
 		Run:        runID(),
@@ -175,11 +134,8 @@ func recordCall(tool string, args json.RawMessage, start time.Time, elapsed time
 		Roundtrips: roundtrips,
 		// Fractional: locally-validated calls return in well under a
 		// millisecond, and integer truncation recorded every one of them as 0.
-		MS:     float64(elapsed.Microseconds()) / 1000,
-		Err:    failed,
-		Commit: build.Commit,
-		Dirty:  build.Dirty,
-		Go:     build.Go,
+		MS:  float64(elapsed.Microseconds()) / 1000,
+		Err: failed,
 	}); err != nil {
 		log.Printf("metrics: %v", err)
 	}

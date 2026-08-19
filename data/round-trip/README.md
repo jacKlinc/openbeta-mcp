@@ -7,7 +7,7 @@ question behind it: `crags_near` and `find_climbs` fan out one upstream query pe
 crag, and nothing recorded what that actually costs.
 
 `data.jsonl` is the dataset. Every number below is derived from it and can be
-recomputed with the script in [Analysis](#analysis).
+recomputed from the run in MLflow — see [Analysis](#analysis).
 
 ## What a sample is
 
@@ -28,13 +28,12 @@ MCP layer, which is the only place that knows what a tool call is.
 | `roundtrips` | HTTP round trips the call made. Includes redirects and, once retry lands, retries. |
 | `ms`         | Wall clock, fractional — sub-millisecond rejections truncated to `0` as integers.  |
 | `err`        | Tool failed. Covers `IsError` results, not only transport errors.                  |
-| `commit`     | The commit the **binary** was built from, via `debug.ReadBuildInfo`.               |
-| `dirty`      | Build had uncommitted changes. Excluded from published numbers.                    |
-| `go`         | Toolchain version.                                                                 |
 
-`commit` comes from the binary rather than `git rev-parse` at analysis time
-because those disagree: the pilot samples were produced by a server built two
-commits behind the tree it ran in.
+The samples in this file also carry `commit`, `dirty` and `go`, recorded from the
+binary's VCS stamp. They are **v0 fields and no longer written**: MLflow tags each
+exported run with the commit it was exported from, so the server stamping its own
+provenance was a second source of truth to keep in step. `v` tells the two shapes
+apart.
 
 ## Cost model
 
@@ -98,14 +97,15 @@ the number to publish rather than `ms`.
 
 ## How to reproduce
 
-The tree must be **completely clean**, `git status --porcelain` empty. Go's VCS
-stamping runs `git status --porcelain` with no `-uno`, so untracked files also
-set `vcs.modified`, and the harness refuses to record samples it cannot
-attribute.
+Start the tracking server first, since the run is pushed to it when the
+benchmark finishes:
 
-Write the samples **outside the repository**, then move the file in. Appending to
-a tracked `data.jsonl` dirties the tree, and the next benchmark invocation would
-be compiled — and stamped — dirty.
+```
+uv run --project evals mlflow server --port 5000
+```
+
+Samples are written **outside the repository** and moved in at the end, so a run
+that dies halfway leaves the tracked dataset as it was.
 
 ```
 scripts/bench.sh                    # refreshes data/round-trip/data.jsonl
@@ -116,11 +116,6 @@ scripts/bench.sh /tmp/scratch.jsonl # somewhere else
 sizes, and prints the summary when it finishes. Turn the VPN off first —
 [retry.md](../../docs/retry.md) explains why a VPN reads as upstream flakiness here.
 
-`-buildvcs=true` is required, not optional. `go test` builds a test-only package,
-which the default `-buildvcs=auto` excludes from VCS stamping, so without the
-flag every sample would record an empty commit. The harness fails rather than
-letting that happen.
-
 Three separate invocations, because `-benchtime` applies to every benchmark it
 matches — `-bench . -benchtime=50x` would give each fan-out tool 50 calls. Each
 benchmark carries a hard iteration cap that fails on a run that omits
@@ -128,7 +123,8 @@ benchmark carries a hard iteration cap that fails on a run that omits
 requests through a fan-out tool.
 
 Squash and rebase merging are disabled on the repository. Both rewrite commits,
-which would leave every `commit` in this file pointing at nothing.
+which would leave the commit tagged on every exported MLflow run pointing at
+nothing.
 
 ## Query set
 
@@ -153,16 +149,21 @@ Rediscover the children with `get_area_details` on the Chief.
 
 ## Analysis
 
+The dataset is pushed to MLflow, which is where the numbers are read:
+
 ```
-python3 evals/analysis/roundtrips.py data/round-trip/data.jsonl
-python3 evals/analysis/roundtrips.py --by commit data/round-trip/data.jsonl
-python3 evals/analysis/roundtrips.py --json data/round-trip/data.jsonl
+uv run --project evals python -m common.export data/round-trip/data.jsonl
 ```
 
-Standard library only. Samples with `dirty: true` are excluded by default and the
-count of exclusions is printed; `--include-dirty` overrides. Percentiles are
-interpolated (`statistics.quantiles`, inclusive), so on small groups a p95 falls
-between the top two observations.
+`scripts/bench.sh` runs this itself when it finishes, so this is only needed for a
+backfill or after the tracking server has been rebuilt. Exporting is idempotent —
+a run already present is skipped unless `--force` is given.
+
+In the UI, each tool's per-call values are a metric series ordered by rank, which
+reads as a quantile curve: `latency_ms.<tool>` and `http_roundtrips.<tool>`. The
+p50/p95/p99 scalars are what compare one run against another. MLflow keeps chart
+layouts in browser-side state rather than on the server, so the charts to build are
+written down in [../../evals/docs/charts.md](../../evals/docs/charts.md) instead.
 
 ## Confounds
 

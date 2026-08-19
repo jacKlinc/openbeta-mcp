@@ -206,10 +206,11 @@ the tooling and it was overkill" reads better than not knowing it exists.
 
 Half one, payload sizing:
 
-- [ ]  Serialize responses across a bbox/density sweep
-- [ ]  Token counts via `count_tokens` and tiktoken
-- [ ]  Distribution, p99, stated breaking point
-- [ ]  Measure tool schema cost separately
+- [x]  Serialize responses across a bbox/density sweep
+- [ ]  Token counts via `count_tokens` and tiktoken — tiktoken only; `count_tokens`
+  still needs a funded API account
+- [x]  Distribution, p99, stated breaking point
+- [x]  Measure tool schema cost separately — `python -m tokens.schema`
 
 Half two, agent eval:
 

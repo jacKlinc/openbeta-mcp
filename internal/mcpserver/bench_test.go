@@ -21,11 +21,6 @@ import (
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
 )
 
-// allowDirtyEnv lets a run proceed from a modified working tree. Off by
-// default: the commit recorded in each sample would not describe the code that
-// produced it.
-const allowDirtyEnv = "OPENBETA_BENCH_ALLOW_DIRTY"
-
 // benchCallTimeout bounds one tool call. Generous against the ~1.2s a
 // twenty-crag fan-out takes, so a slow crag does not end the run.
 const benchCallTimeout = 60 * time.Second
@@ -98,18 +93,7 @@ func benchGate(b *testing.B) {
 		b.Fatalf("set %s to an absolute path; the samples are the result, the timings are a summary", metricsEnv)
 	}
 
-	build := buildStamp()
-	if build.Commit == "" {
-		// go test builds a test-only package, which -buildvcs=auto skips, so
-		// without the explicit flag every sample records an empty commit.
-		b.Fatal("no vcs.revision in this binary: re-run with -buildvcs=true")
-	}
-	if build.Dirty && os.Getenv(allowDirtyEnv) == "" {
-		b.Fatalf("working tree is dirty; commit %s would not reproduce these samples (set %s=1 to override)",
-			build.Commit[:12], allowDirtyEnv)
-	}
-
-	b.Logf("commit %s dirty=%v run %s", build.Commit[:12], build.Dirty, runID())
+	b.Logf("run %s", runID())
 }
 
 // connectLive wires a client and server over the in-memory transport against

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Fix what ruff can fix under evals/ and refuse the push if it changed anything --
+# a fix at push time cannot rewrite the commits being pushed, so the tree is
+# corrected here and the commit is left to you. Notebooks are excluded in
+# evals/pyproject.toml.
+#
+# Enable with: git config core.hooksPath .githooks
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+if ! command -v uv >/dev/null; then
+	echo "pre-push: uv not found; skipping ruff" >&2
+	exit 0
+fi
+
+ruff() { uv run --project evals --group dev ruff "$@"; }
+
+if ruff check --fix --exit-non-zero-on-fix evals; then
+	exit 0
+fi
+
+echo
+if ruff check evals >/dev/null 2>&1; then
+	echo "pre-push: ruff fixed your working tree (see above). Review, commit, and push again."
+else
+	echo "pre-push: ruff found problems it cannot fix (above). Fix them and push again."
+fi
+exit 1
