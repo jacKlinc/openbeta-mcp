@@ -6,9 +6,12 @@
       "Bash(python3 -c ' *)",
       "Bash(curl -s -m 25 -w \"\\\\nHTTP %{http_code} in %{time_total}s\\\\n\" -X POST \"https://api.openbeta.io/graphql\" -H 'Content-Type: application/json' -d '{\"query\":\"{areas\\(filter:{area_name:{match:\\\\\"Smith Rock\\\\\"}}\\){area_name uuid totalClimbs}}\"}')",
       "Bash(uv add *)",
+      "Bash(uv sync *)",
+      "Bash(uv remove *)",
       "Bash(gofmt -l internal/)",
       "Bash(OPENBETA_LIVE=1 go test ./internal/openbeta -run *)",
       "Bash(go fmt *)",
+      "Bash(go clean *)",
       "Bash(PYENV_VERSION=system python3 -)",
       "Bash(gofmt -w internal/tools/)",
       "Bash(git add *)",
@@ -17,7 +20,10 @@
       "Bash(gh pr create *)",
       "Bash(gh pr view *)",
       "Bash(git fetch *)",
-      "mcp__openbeta__*"
+      "Bash(git checkout *)",
+      "Bash(git mv *)",
+      "mcp__openbeta__*",
+      "Bash(OPENBETA_LIVE=1 go test -run Live -count=1 ./internal/openbeta)"
     ]
   }
 }
