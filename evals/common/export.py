@@ -22,10 +22,17 @@ EXPERIMENT = "MCP Tool Performance"
 # config file. This makes the intended view part of the run: reviewable in a
 # diff, and enough to rebuild the charts in the chart builder.
 #
-# The distribution charts are the ones that replaced the plotting code. Each
-# per-call metric is logged with step = its rank among that tool's values sorted
+# The distribution charts are the ones that replaced the ECDF. Each per-call
+# metric is logged with step = its rank among that tool's values sorted
 # ascending, so the built-in line chart draws the quantile curve — the ECDF with
 # its axes transposed.
+#
+# Two limits of the UI shape what can be declared here. A series takes its
+# colour from its run rather than its metric, so one run's three tools arrive in
+# one colour told apart only by dash pattern. And a bar chart plots a single
+# metric with bars as runs, so a tail comparison across tools has to be parallel
+# coordinates instead. Histograms and cost-against-an-argument have no form at
+# all in MLflow; those are in common/plots.py.
 CHARTS = {
     "version": 1,
     "charts": [
@@ -59,9 +66,12 @@ CHARTS = {
         },
         {
             "title": "Tail by tool, across runs",
-            "type": "bar",
+            "type": "parallel coordinates",
             "metrics": ["tokens.<tool>.p50", "tokens.<tool>.p95", "tokens.<tool>.p99"],
-            "note": "Compare runs, not calls. <tool> is each of the three tool names.",
+            "note": (
+                "Compare runs, not calls: one line per run across the percentile axes. "
+                "<tool> is each of the three tool names."
+            ),
         },
     ],
 }
@@ -99,13 +109,13 @@ def log_distribution(df: pd.DataFrame, column: str, prefix: str) -> None:
         for rank, value in enumerate(values):
             mlflow.log_metric(f"{prefix}.{tool}", value, step=rank)
 
+        # Percentiles and a count, nothing else. MLflow draws one chart card per
+        # metric name, so every extra scalar is another flat bar to scroll past --
+        # and mean, max and sum are all recoverable from the JSONL a run came from.
+        # The mean is the one worth losing: these distributions are bimodal, so it
+        # lands in the empty gap between modes and describes no call that happened.
         series = pd.Series(values)
-        scalars = {
-            f"{prefix}.{tool}.n": len(values),
-            f"{prefix}.{tool}.mean": series.mean(),
-            f"{prefix}.{tool}.max": series.max(),
-            f"{prefix}.{tool}.total": series.sum(),
-        }
+        scalars = {f"{prefix}.{tool}.n": len(values)}
         for pct in PERCENTILES:
             scalars[f"{prefix}.{tool}.p{pct}"] = series.quantile(pct / 100)
         mlflow.log_metrics(scalars)
