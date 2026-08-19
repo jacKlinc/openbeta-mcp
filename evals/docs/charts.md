@@ -55,9 +55,8 @@ repaints the others.
 ## In MLflow
 
 http://localhost:5000 → **MCP Tool Performance** → tick a run → **Chart** view →
-**Add chart**. Layouts live in browser-side state, so nothing built in the UI
-travels; `CHARTS` in [../common/export.py](../common/export.py) is the copy that
-does, shipped to every run as `charts.json`.
+**Add chart**. Layouts live in browser-side state, so a view built in the UI does
+not travel between machines — this page is the copy that does.
 
 What a run gives you, per tool, per measure — `tokens`, `latency_ms`,
 `http_roundtrips`:

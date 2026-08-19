@@ -160,10 +160,10 @@ backfill or after the tracking server has been rebuilt. Exporting is idempotent 
 a run already present is skipped unless `--force` is given.
 
 In the UI, each tool's per-call values are a metric series ordered by rank, which
-reads as a quantile curve: `ms.<tool>` and `http_roundtrips.<tool>`. The p50/p95/p99
-scalars are what compare one run against another. `charts.json` in the run's
-artifacts declares the intended charts, since MLflow keeps chart layouts in
-browser-side state rather than on the server.
+reads as a quantile curve: `latency_ms.<tool>` and `http_roundtrips.<tool>`. The
+p50/p95/p99 scalars are what compare one run against another. MLflow keeps chart
+layouts in browser-side state rather than on the server, so the charts to build are
+written down in [../../evals/docs/charts.md](../../evals/docs/charts.md) instead.
 
 ## Confounds
 

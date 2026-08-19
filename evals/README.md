@@ -73,9 +73,8 @@ right is the tail. That is the ECDF, transposed. The p50/p95/p99 scalars are
 what compare runs.
 
 MLflow keeps chart layouts in browser-side state, so a view built in the UI does
-not travel. `CHARTS` in [common/export.py](common/export.py) declares the intended
-charts and is logged to every run as `charts.json` — the reproducible record of
-which metrics form which chart.
+not travel; [docs/charts.md](docs/charts.md) is the record of which metrics form
+which chart.
 
 The shapes MLflow has no form for — a histogram, cost against an argument — are
 figures in [common/plots.py](common/plots.py), written to be imported from a

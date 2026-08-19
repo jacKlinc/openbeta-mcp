@@ -153,9 +153,9 @@ In the UI, each tool's per-call values form a metric series ordered by rank
 (`tokens.<tool>`, `latency_ms.<tool>`, `http_roundtrips.<tool>`), which reads as a
 quantile curve: a flat shelf is a mode, the rise at the right is the tail. The
 bimodality described above is the long shelf at ~31 tokens. The p50/p95/p99 scalars
-are what compare one run against another, and `charts.json` in the run's artifacts
-declares the intended charts — MLflow keeps chart layouts in browser-side state, so
-the spec is what makes the view reproducible.
+are what compare one run against another. MLflow keeps chart layouts in browser-side
+state, so the charts to build are written down in
+[../../evals/docs/charts.md](../../evals/docs/charts.md) instead.
 
 ## Confounds
 
