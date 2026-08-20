@@ -44,7 +44,7 @@ class Sampling:
                    silently shrinking would look like a result rather than a bug.
     """
 
-    DISTANCES_KM = [1, 2, 3, 5, 8, 12, 20, 35, 50]
+    DISTANCES_KM = (1, 2, 3, 5, 8, 12, 20, 35, 50)
     PLATEAU_RUNGS = 2
     EMPTIES = 5
     CRAWL_TARGET = 150
@@ -277,7 +277,7 @@ async def crawl(target: int = Sampling.CRAWL_TARGET, delay: float = 0.2) -> list
 
     async with mcp_session() as session:
         while queue and len(seen) < target:
-            # Marked known before call, not after: a UUID that fails is not worth a second attempt through another parent
+            # Marked known before call, not after: a UUID that fails is not worth a second try through another parent
             uuid = queue.pop(0)
             if uuid in known:
                 continue
