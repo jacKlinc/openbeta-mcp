@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Sweep the token corpus against the live API and refresh the dataset.
-#
 # Usage: scripts/tokens.sh [extra args for tokens.sweep]
+# Runs against the public API unless OPENBETA_ENDPOINT points elsewhere; the
+# harness passes the environment through to the server subprocess. Against a
+# local stack the pacing is pointless, so:
+#
+#   OPENBETA_ENDPOINT=http://localhost:4000 scripts/tokens.sh --delay 0
 #
 # Writes data/tokens/data.jsonl (token counts, from the harness) and
 # data/tokens/roundtrips.jsonl (latency and HTTP round trips, from the server's

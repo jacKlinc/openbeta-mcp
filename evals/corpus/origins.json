@@ -1,0 +1,643 @@
+{
+  "probe": {
+    "ladder_km": [
+      1,
+      2,
+      3,
+      5,
+      8,
+      12,
+      20,
+      35,
+      50
+    ],
+    "plateau_rungs": 2,
+    "endpoint": "http://localhost:4000",
+    "max_crags": "default"
+  },
+  "origins": [
+    {
+      "place": "Bishop",
+      "radii": [
+        5,
+        8
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 2,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 3,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 5,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 8,
+          "count": 20,
+          "band": "growing"
+        },
+        {
+          "km": 12,
+          "count": 20,
+          "band": "plateau"
+        },
+        {
+          "km": 20,
+          "count": 20,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Yosemite",
+      "radii": [
+        1
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 20,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 20,
+          "band": "plateau"
+        },
+        {
+          "km": 3,
+          "count": 20,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Joshua Tree",
+      "radii": [
+        12,
+        20
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 2,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 3,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 5,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 8,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 12,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 20,
+          "count": 18,
+          "band": "growing"
+        },
+        {
+          "km": 35,
+          "count": 18,
+          "band": "plateau"
+        },
+        {
+          "km": 50,
+          "count": 18,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Red Rocks",
+      "radii": [
+        1,
+        2
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 5,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 20,
+          "band": "growing"
+        },
+        {
+          "km": 3,
+          "count": 20,
+          "band": "plateau"
+        },
+        {
+          "km": 5,
+          "count": 20,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Indian Creek",
+      "radii": [
+        3,
+        5
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 9,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 14,
+          "band": "growing"
+        },
+        {
+          "km": 3,
+          "count": 15,
+          "band": "growing"
+        },
+        {
+          "km": 5,
+          "count": 18,
+          "band": "growing"
+        },
+        {
+          "km": 8,
+          "count": 18,
+          "band": "plateau"
+        },
+        {
+          "km": 12,
+          "count": 18,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Moab",
+      "radii": [
+        1,
+        3,
+        5
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 2,
+          "count": 7,
+          "band": "growing"
+        },
+        {
+          "km": 3,
+          "count": 12,
+          "band": "growing"
+        },
+        {
+          "km": 5,
+          "count": 20,
+          "band": "growing"
+        },
+        {
+          "km": 8,
+          "count": 20,
+          "band": "plateau"
+        },
+        {
+          "km": 12,
+          "count": 20,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Index",
+      "radii": [
+        1
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 20,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 20,
+          "band": "plateau"
+        },
+        {
+          "km": 3,
+          "count": 20,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Leavenworth",
+      "radii": [
+        1,
+        2,
+        3
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 2,
+          "count": 7,
+          "band": "growing"
+        },
+        {
+          "km": 3,
+          "count": 20,
+          "band": "growing"
+        },
+        {
+          "km": 5,
+          "count": 20,
+          "band": "plateau"
+        },
+        {
+          "km": 8,
+          "count": 20,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Smith Rock",
+      "radii": [
+        1
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 18,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 18,
+          "band": "plateau"
+        },
+        {
+          "km": 3,
+          "count": 18,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Red River Gorge",
+      "radii": [
+        5,
+        8
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 1,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 1,
+          "band": "plateau"
+        },
+        {
+          "km": 3,
+          "count": 4,
+          "band": "growing"
+        },
+        {
+          "km": 5,
+          "count": 12,
+          "band": "growing"
+        },
+        {
+          "km": 8,
+          "count": 19,
+          "band": "growing"
+        },
+        {
+          "km": 12,
+          "count": 19,
+          "band": "plateau"
+        },
+        {
+          "km": 20,
+          "count": 19,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "New River Gorge",
+      "radii": [
+        1,
+        2
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 15,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 20,
+          "band": "growing"
+        },
+        {
+          "km": 3,
+          "count": 20,
+          "band": "plateau"
+        },
+        {
+          "km": 5,
+          "count": 20,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "The Gunks",
+      "radii": [
+        1
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 20,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 20,
+          "band": "plateau"
+        },
+        {
+          "km": 3,
+          "count": 20,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Rumney",
+      "radii": [
+        1
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 16,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 16,
+          "band": "plateau"
+        },
+        {
+          "km": 3,
+          "count": 16,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Boulder",
+      "radii": [
+        1,
+        2
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 12,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 19,
+          "band": "growing"
+        },
+        {
+          "km": 3,
+          "count": 19,
+          "band": "plateau"
+        },
+        {
+          "km": 5,
+          "count": 19,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Estes Park",
+      "radii": [
+        2,
+        3
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 2,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 2,
+          "band": "plateau"
+        },
+        {
+          "km": 3,
+          "count": 18,
+          "band": "growing"
+        },
+        {
+          "km": 5,
+          "count": 18,
+          "band": "plateau"
+        },
+        {
+          "km": 8,
+          "count": 18,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Ten Sleep",
+      "radii": [
+        12,
+        20
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 2,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 3,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 5,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 8,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 12,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 20,
+          "count": 18,
+          "band": "growing"
+        },
+        {
+          "km": 35,
+          "count": 18,
+          "band": "plateau"
+        },
+        {
+          "km": 50,
+          "count": 18,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Lander",
+      "radii": [
+        12,
+        20
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 2,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 3,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 5,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 8,
+          "count": 0,
+          "band": "empty"
+        },
+        {
+          "km": 12,
+          "count": 9,
+          "band": "growing"
+        },
+        {
+          "km": 20,
+          "count": 20,
+          "band": "growing"
+        },
+        {
+          "km": 35,
+          "count": 20,
+          "band": "plateau"
+        },
+        {
+          "km": 50,
+          "count": 20,
+          "band": "plateau"
+        }
+      ]
+    },
+    {
+      "place": "Hueco Tanks",
+      "radii": [
+        1
+      ],
+      "ladder": [
+        {
+          "km": 1,
+          "count": 20,
+          "band": "growing"
+        },
+        {
+          "km": 2,
+          "count": 20,
+          "band": "plateau"
+        },
+        {
+          "km": 3,
+          "count": 20,
+          "band": "plateau"
+        }
+      ]
+    }
+  ]
+}

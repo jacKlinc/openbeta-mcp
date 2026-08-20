@@ -43,22 +43,39 @@ datasets, and pushes them to MLflow. Results and confounds are in
 
 A tool result is deterministic for its arguments, so calling one twice adds
 nothing. **The spread comes from the breadth of the corpus, not from repetition**
-— `n` is the number of argument sets, which is why `tokens/corpus.py` crosses
-every gazetteer place with three search radii and crawls the area hierarchy
-rather than looping over five fixed queries.
+— `n` is the number of argument sets.
+
+Breadth is not the same as volume, though. `tokens/corpus.py` walks each place
+up a radius ladder and keeps only the rungs whose payloads differ, because above
+the `MaxCrags` cap a wider radius returns the same nearest crags and a second
+call there is a byte-identical duplicate. The gazetteer-crossed-with-radii
+corpus this replaced spent 144 calls per tool to buy 32 calls' worth of
+information, 60 of them on empty results. See
+[../docs/findings/corpus/README.md](../docs/findings/corpus/README.md).
 
 | Command | What it does |
 |---|---|
 | `python -m tokens.corpus` | print the corpus sizes |
-| `python -m tokens.corpus --crawl` | rebuild `corpus/areas.json` from the live API |
+| `python -m tokens.corpus --probe` | rebuild `corpus/origins.json`: walk each place up the radius ladder |
+| `python -m tokens.corpus --crawl` | rebuild `corpus/areas.json` from the area hierarchy |
 | `python -m tokens.sweep` | measure every argument set, append rows, cache payloads |
 | `python -m tokens.sweep --use-cache` | re-count from cached payloads, no live calls |
 | `python -m tokens.schema` | size of the tool definitions, resent every turn |
 | `python -m common.export <data.jsonl>...` | push runs to MLflow; `--force` re-exports |
 
 Payloads are cached under `data/tokens/cache/` by `args_sha`, so changing the
-tokenizer costs no upstream calls. The API is free and volunteer-run: calls are
-serial and paced.
+tokenizer costs no upstream calls. The public API is free and volunteer-run:
+calls are serial and paced. Against a local stack neither applies —
+`OPENBETA_ENDPOINT=http://localhost:4000 scripts/tokens.sh --delay 0` finishes
+in seconds.
+
+Two things the cache does not know about: `args_sha` covers the arguments only,
+so a payload cached under one endpoint or one `OPENBETA_MAX_CRAGS` is
+indistinguishable from another. A live sweep always overwrites, so only
+`--use-cache` can read a payload from a run it did not mean. The same blind spot
+applies to the `endpoint` and `max_crags` MLflow params: they are read from the
+environment at export time, which is right when `scripts/tokens.sh` exports in
+the same shell as the sweep, and a guess if you re-export a dataset later.
 
 Rows carry the same field names the server's own sink writes, and `args_sha` is
 computed exactly as Go computes it — same canonical JSON, same first 12 hex of
