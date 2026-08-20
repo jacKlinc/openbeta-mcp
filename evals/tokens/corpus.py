@@ -21,6 +21,7 @@ GAZETTEER = REPO_ROOT / "internal" / "geo" / "gazetteer.go"
 AREAS_JSON = EVALS_ROOT / "corpus" / "areas.json"
 ORIGINS_JSON = EVALS_ROOT / "corpus" / "origins.json"
 
+
 class Sampling:
     """The knobs that decide which calls the corpus makes.
 
@@ -105,35 +106,8 @@ def places() -> list[str]:
 
     names = re.findall(r'^\s*"([^"]+)":', block.group(1), re.M)
     if len(names) < Sampling.MIN_PLACES:
-        raise RuntimeError(
-            f"{GAZETTEER}: parsed only {len(names)} places, expected at least {Sampling.MIN_PLACES}"
-        )
+        raise RuntimeError(f"{GAZETTEER}: parsed only {len(names)} places, expected at least {Sampling.MIN_PLACES}")
     return names
-
-
-def area_ids() -> list[str]:
-    """UUIDs from the committed crawl, falling back to the seeds."""
-    if AREAS_JSON.exists():
-        return json.loads(AREAS_JSON.read_text())["areas"]
-    logger.warning("%s missing; falling back to %d seeds", AREAS_JSON, len(AREA_SEEDS))
-    return list(AREA_SEEDS)
-
-
-def band_of(count: int, previous: int | None) -> str:
-    """Which regime a rung is in, given the rung below it."""
-    if count == 0:
-        return "empty"
-    if previous is None or count > previous:
-        return "growing"
-    return "plateau"
-
-
-def origins() -> list[dict[str, Any]]:
-    """Each place and the radii to call it at, from the committed probe."""
-    if ORIGINS_JSON.exists():
-        return json.loads(ORIGINS_JSON.read_text())["origins"]
-    logger.warning("%s missing; falling back to %d unprobed places", ORIGINS_JSON, len(US_PLACES))
-    return [{"place": p, "radii": [Sampling.DISTANCES_KM[-1]]} for p in US_PLACES]
 
 
 def build() -> dict[str, list[dict[str, Any]]]:
@@ -142,33 +116,40 @@ def build() -> dict[str, list[dict[str, Any]]]:
     Each place brings its own radii rather than a shared list: which radii change
     the payload depends on how the crags around that place are spread.
     """
-    fan_out = [
-        {"place": o["place"], "maxDistanceKm": km} for o in origins() for km in o["radii"]
-    ]
+    # Both committed artefacts, both with a fallback: an unprobed checkout still
+    # produces a corpus, just a blunter one, rather than failing at import.
+    if ORIGINS_JSON.exists():
+        origins = json.loads(ORIGINS_JSON.read_text())["origins"]
+    else:
+        logger.warning("%s missing; falling back to %d unprobed places", ORIGINS_JSON, len(US_PLACES))
+        origins = [{"place": p, "radii": [Sampling.DISTANCES_KM[-1]]} for p in US_PLACES]
+
+    if AREAS_JSON.exists():
+        areas = json.loads(AREAS_JSON.read_text())["areas"]
+    else:
+        logger.warning("%s missing; falling back to %d seeds", AREAS_JSON, len(AREA_SEEDS))
+        areas = list(AREA_SEEDS)
+
+    fan_out = [{"place": o["place"], "maxDistanceKm": km} for o in origins for km in o["radii"]]
     return {
         "crags_near": fan_out,
         "find_climbs": [args | GRADE_WINDOW for args in fan_out],
-        "get_area_details": [{"areaId": uuid} for uuid in area_ids()],
+        "get_area_details": [{"areaId": uuid} for uuid in areas],
     }
 
 
-def canonical(args: dict[str, Any]) -> str:
-    """Arguments as Go's encoding/json would render them.
+def args_sha(args: dict[str, Any]) -> str:
+    """First 12 hex of the SHA-256 of the arguments, as argsSHA computes it.
 
-    Go marshals map keys sorted, without spaces, and escapes <, > and & as \\u
-    sequences. Reproduced exactly so that args_sha here matches the args_sha the
-    server writes for the same call, and the two datasets join on it.
+    Matches argsSHA in internal/mcpserver/metrics.go, so the harness dataset and
+    the server's own sink join on (tool, args_sha). Go marshals map keys sorted,
+    without spaces, and escapes <, > and & as \\u sequences -- reproduced here
+    exactly, because a different rendering is a different hash and the two
+    datasets would stop joining.
     """
     encoded = json.dumps(args, sort_keys=True, separators=(",", ":"))
-    return encoded.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
-
-
-def args_sha(args: dict[str, Any]) -> str:
-    """First 12 hex of the SHA-256 of the canonical arguments.
-
-    Matches argsSHA in internal/mcpserver/metrics.go.
-    """
-    return hashlib.sha256(canonical(args).encode()).hexdigest()[:12]
+    canonical = encoded.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    return hashlib.sha256(canonical.encode()).hexdigest()[:12]
 
 
 def _child_uuids(payload: Any) -> list[str]:
@@ -212,11 +193,19 @@ async def probe(limit: int | None = None, delay: float = 0.0) -> list[dict[str, 
                     failed += 1
                     continue
 
-                previous = ladder[-1]["count"] if ladder else None
-                ladder.append({"km": km, "count": count, "band": band_of(count, previous)})
+                # Empty, still finding crags, or settled. A count that stops
+                # rising is the cap binding, not the crags running out.
+                if count == 0:
+                    band = "empty"
+                elif not ladder or count > ladder[-1]["count"]:
+                    band = "growing"
+                else:
+                    band = "plateau"
+
+                ladder.append({"km": km, "count": count, "band": band})
                 await asyncio.sleep(delay)
 
-                flat = [r["band"] for r in ladder[-Sampling.PLATEAU_RUNGS:]]
+                flat = [r["band"] for r in ladder[-Sampling.PLATEAU_RUNGS :]]
                 if len(flat) == Sampling.PLATEAU_RUNGS and set(flat) == {"plateau"}:
                     break
 
@@ -260,10 +249,7 @@ def select(probed: list[dict[str, Any]]) -> list[dict[str, Any]]:
     No place is empty at every radius, so the pinned empties are the widest rung
     that still found nothing -- the one just below where the crags start.
     """
-    entries = [
-        {"place": p["place"], "radii": radii_for(p["ladder"]), "ladder": p["ladder"]}
-        for p in probed
-    ]
+    entries = [{"place": p["place"], "radii": radii_for(p["ladder"]), "ladder": p["ladder"]} for p in probed]
 
     pinned = 0
     for entry, place in zip(entries, probed, strict=True):
@@ -284,23 +270,27 @@ async def crawl(target: int = Sampling.CRAWL_TARGET, delay: float = 0.2) -> list
     descending, so the corpus mixes big sub-area listings with the leaf crags
     below them instead of running straight down one branch.
     """
+    # `sweep --limit N` measures the top N areas of the hierarchy
     seen: list[str] = []
     known: set[str] = set()
     queue = list(AREA_SEEDS)
 
     async with mcp_session() as session:
         while queue and len(seen) < target:
+            # Marked known before call, not after: a UUID that fails is not worth a second attempt through another parent
             uuid = queue.pop(0)
             if uuid in known:
                 continue
             known.add(uuid)
 
+            # An area that did not answer is not an area to measure
             result = await session.call_tool("get_area_details", {"areaId": uuid})
             if result.is_error:
                 logger.warning("crawl: %s failed, skipping", uuid)
                 continue
             seen.append(uuid)
 
+            # Kept even if the children cannot be read: the area itself answered, so it is a valid call to measure
             try:
                 payload = json.loads(text_of(result))
             except json.JSONDecodeError:
@@ -348,9 +338,7 @@ def main() -> None:
     if args.crawl:
         collected = asyncio.run(crawl(args.limit))
         AREAS_JSON.parent.mkdir(parents=True, exist_ok=True)
-        AREAS_JSON.write_text(
-            json.dumps({"seeds": AREA_SEEDS, "areas": collected}, indent=2) + "\n"
-        )
+        AREAS_JSON.write_text(json.dumps({"seeds": AREA_SEEDS, "areas": collected}, indent=2) + "\n")
         print(f"{len(collected)} area UUIDs written to {AREAS_JSON}")
         return
 
