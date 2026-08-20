@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -14,6 +15,13 @@ logger = logging.getLogger(__name__)
 
 TRACKING_URI = "http://localhost:5000"
 EXPERIMENT = "MCP Tool Performance"
+
+# What the server was pointed at and how it was configured. Read from the
+# environment at export time, which is only right because scripts/tokens.sh
+# exports in the same shell as the sweep -- a re-export later would guess. The
+# defaults mirror cmd/openbeta-mcp/main.go.
+PUBLIC_ENDPOINT = "https://api.openbeta.io/graphql"
+DEFAULT_MAX_CRAGS = "20"
 
 # Column -> metric prefix. A file's measurement is decided by the fields its rows
 # carry, not its name, so one code path serves the token sweep and the Go bench.
@@ -71,6 +79,8 @@ def log_run(run: str, frames: list[pd.DataFrame]) -> None:
                 "tools": combined["tool"].nunique(),
                 "queries": combined["args_sha"].nunique(),
                 "encoding": combined.get("encoding", pd.Series(["-"])).iloc[0],
+                "endpoint": os.environ.get("OPENBETA_ENDPOINT") or PUBLIC_ENDPOINT,
+                "max_crags": os.environ.get("OPENBETA_MAX_CRAGS") or DEFAULT_MAX_CRAGS,
             }
         )
 

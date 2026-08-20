@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -17,6 +18,7 @@ import (
 
 	"github.com/jacKlinc/openbeta-mcp/internal/mcpserver"
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta"
+	"github.com/jacKlinc/openbeta-mcp/internal/tools"
 )
 
 // version is overridable at build time:
@@ -42,8 +44,24 @@ func defaultEndpoint() string {
 	return openbeta.DefaultEndpoint
 }
 
+// defaultMaxCrags resolves the cap on crags returned by one call, same
+// precedence as the endpoint. It exists so the eval harness can sweep the cap
+// and measure what it costs; unset keeps the shipped default.
+func defaultMaxCrags() int {
+	v := os.Getenv("OPENBETA_MAX_CRAGS")
+	if v == "" {
+		return tools.MaxCrags
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		log.Fatalf("OPENBETA_MAX_CRAGS: want a positive integer, got %q", v)
+	}
+	return n
+}
+
 func main() {
 	endpoint := flag.String("endpoint", defaultEndpoint(), "OpenBeta GraphQL endpoint (or set OPENBETA_ENDPOINT)")
+	maxCrags := flag.Int("max-crags", defaultMaxCrags(), "crags returned per call (or set OPENBETA_MAX_CRAGS)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
@@ -63,10 +81,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	tools.MaxCrags = *maxCrags
+
 	client := openbeta.New(openbeta.WithEndpoint(*endpoint))
 	server := mcpserver.New(client, version)
 
-	log.Printf("serving %s on stdio (version %s)", *endpoint, version)
+	log.Printf("serving %s on stdio (version %s, maxCrags %d)", *endpoint, version, *maxCrags)
 	err := server.Run(ctx, &mcp.StdioTransport{})
 	// A hangup surfaces two different ways depending on what the server was doing
 	// when stdin closed: idle, Run returns nil; mid-message, it returns the SDK's

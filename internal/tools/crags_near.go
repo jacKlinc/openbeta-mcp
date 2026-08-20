@@ -18,7 +18,10 @@ import (
 // MaxCrags caps how many crags a single call returns. A metro-sized search
 // yields far more than a model can usefully read, so only the nearest are kept
 // and Count reports how many were found.
-const MaxCrags = 20
+//
+// A var rather than a const so the eval harness can sweep it and measure what
+// the cap costs; main.go sets it once at startup, before the first call.
+var MaxCrags = 20
 
 // defaultMaxDistanceKm is a radius that covers a climbing destination and its
 // surroundings without reaching the next one.
