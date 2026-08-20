@@ -53,6 +53,8 @@ data/round-trip/*
 data/tokens/*
 !data/tokens/data.jsonl
 !data/tokens/roundtrips.jsonl
+# The MaxCrags sweep: the evidence behind docs/findings/corpus.
+!data/tokens/cap*.jsonl
 !data/tokens/README.md
 !data/tokens/plots/
 data/tokens/plots/*
