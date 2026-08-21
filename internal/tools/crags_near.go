@@ -65,9 +65,10 @@ type NearbyCrag struct {
 
 // CragsNearResult is the output schema for crags_near.
 type CragsNearResult struct {
-	Crags  []NearbyCrag  `json:"crags" jsonschema:"Crags holding climbs, most climbs first. Capped at 20."`
-	Count  int           `json:"count" jsonschema:"How many crags with climbs were found within the radius. May exceed the crags array, which is capped at 20."`
-	Origin ResolvedPlace `json:"origin"`
+	Crags    []NearbyCrag  `json:"crags" jsonschema:"Crags holding climbs, most climbs first. Capped at 20."`
+	Count    int           `json:"count" jsonschema:"How many crags the radius found, before the nearest 20 were kept and before crags with no climbs were dropped. An upper bound: it counts crags that may hold nothing climbable."`
+	Returned int           `json:"returned" jsonschema:"How many crags are in the crags array. At most 20."`
+	Origin   ResolvedPlace `json:"origin"`
 }
 
 // core: no MCP types, returns a plain error
@@ -80,7 +81,11 @@ func cragsNear(ctx context.Context, gql graphql.Client, resolver geo.Resolver, a
 	point := geo.Point{Lat: origin.Lat, Lng: origin.Lng}
 	// Nearest first, capped. Ranking by climb count is not possible here —
 	// cragsNear returns no climbs, which is what the fan-out below is for.
-	found, err := nearestCrags(ctx, gql, point, args.MaxDistanceKm)
+	//
+	// total is taken before the cap and before the climb filter, because those
+	// are the two steps that make len(crags) unable to exceed MaxCrags — which
+	// is what the schema had been promising it could.
+	found, total, err := nearestCrags(ctx, gql, point, args.MaxDistanceKm)
 	if err != nil {
 		return CragsNearResult{}, err
 	}
@@ -96,7 +101,7 @@ func cragsNear(ctx context.Context, gql graphql.Client, resolver geo.Resolver, a
 		return cmp.Compare(b.ClimbCount, a.ClimbCount)
 	})
 
-	return CragsNearResult{Crags: crags, Count: len(crags), Origin: origin}, nil
+	return CragsNearResult{Crags: crags, Count: total, Returned: len(crags), Origin: origin}, nil
 }
 
 // CragsNearCrag is the generated area type cragsNear returns. Aliased because
@@ -143,9 +148,8 @@ func resolveOrigin(ctx context.Context, resolver geo.Resolver, args CragsNearArg
 //
 // A crag that fails is dropped rather than failing the whole call: upstream
 // returns intermittent 502s, and one of them should degrade a result rather
-// than erase it. If every call fails, that is an outage and the error is
-// returned, because an empty list would read as "nothing here".
-func fetchAreaDetails(ctx context.Context, gql graphql.Client, areas []CragsNearCrag) ([]*generated.GetAreaDetailsArea, error) {
+// than erase it.
+func fetchAreaDetails(ctx context.Context, gql graphql.Client, areas []CragsNearCrag) ([]*generated.GetAreaDetailsArea, int, error) {
 	// Per-index slots rather than shared variables: every goroutine writes only
 	// its own element, so no locking is needed to collect either result.
 	details := make([]*generated.GetAreaDetailsArea, len(areas))
@@ -165,7 +169,7 @@ func fetchAreaDetails(ctx context.Context, gql graphql.Client, areas []CragsNear
 		})
 	}
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	failed := 0
@@ -178,16 +182,22 @@ func fetchAreaDetails(ctx context.Context, gql graphql.Client, areas []CragsNear
 			}
 		}
 	}
-	if len(areas) > 0 && failed == len(areas) {
-		return nil, fmt.Errorf("no crag details could be fetched: %w", firstErr)
+	return details, failed, firstErr
+}
+
+// allFailed turns "every detail call failed" into an error, and anything less
+// into nil.
+func allFailed(attempted, failed int, firstErr error) error {
+	if attempted > 0 && failed == attempted {
+		return fmt.Errorf("no crag details could be fetched: %w", firstErr)
 	}
-	return details, nil
+	return nil
 }
 
 // withClimbCounts fills in the climb count cragsNear cannot provide.
 func withClimbCounts(ctx context.Context, gql graphql.Client, origin geo.Point, areas []CragsNearCrag) ([]NearbyCrag, error) {
-	details, err := fetchAreaDetails(ctx, gql, areas)
-	if err != nil {
+	details, failed, firstErr := fetchAreaDetails(ctx, gql, areas)
+	if err := allFailed(len(areas), failed, firstErr); err != nil {
 		return nil, err
 	}
 

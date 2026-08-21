@@ -154,7 +154,8 @@ func TestInvalidInputIsAToolError(t *testing.T) {
 		{"lnglat wrong length", "crags_near", map[string]any{"lnglat": []float64{1}}, "exactly 2 elements"},
 		{"lat/lng transposed", "crags_near", map[string]any{"lnglat": []float64{49.7, -123.2}}, "latitude out of range"},
 		{"unknown place", "crags_near", map[string]any{"place": "Nowhere At All"}, "no coordinates known"},
-		{"non-YDS grade", "find_climbs", map[string]any{"place": "Squamish", "minGrade": "V4"}, "YDS"},
+		{"grade in no system", "find_climbs", map[string]any{"place": "Squamish", "minGrade": "V4"}, "not a grade in any system"},
+		{"unknown discipline", "find_climbs", map[string]any{"place": "Squamish", "disciplines": []string{"bouldering"}}, "V-scale or Font"},
 		{"bad uuid", "get_area_details", map[string]any{"areaId": "not-a-uuid"}, "invalid UUID length: 10"},
 	}
 	for _, tt := range tests {

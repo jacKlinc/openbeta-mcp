@@ -208,6 +208,11 @@ func TestLiveFindClimbs(t *testing.T) {
 		if c.Multipitch == tools.PitchesYes {
 			sawKnownMultipitch = true
 		}
+		if c.GradeSystem != string(grade.YDS) {
+			t.Errorf("%q reports gradeSystem %q, want %q", c.Name, c.GradeSystem, grade.YDS)
+			continue
+		}
+
 		// Every result must be inside the requested range. Parsing here rather
 		// than trusting the tool is the point of the assertion.
 		span, err := grade.ParseYDS(c.Grade)
@@ -217,7 +222,12 @@ func TestLiveFindClimbs(t *testing.T) {
 		}
 		lo, _ := grade.ParseYDS("5.8")
 		hi, _ := grade.ParseYDS("5.10b")
-		if !span.Overlaps(grade.Span{Lo: lo.Lo, Hi: hi.Hi}) {
+		in, err := span.Overlaps(grade.Span{Lo: lo.Lo, Hi: hi.Hi, System: grade.YDS})
+		if err != nil {
+			t.Errorf("%q at %s: %v", c.Name, c.Grade, err)
+			continue
+		}
+		if !in {
 			t.Errorf("%q at %s is outside 5.8-5.10b", c.Name, c.Grade)
 		}
 	}

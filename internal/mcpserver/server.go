@@ -41,22 +41,39 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 			"if the place is not recognised the error will say so, and you can retry with " +
 			"'lnglat' as [longitude, latitude]. Returns each crag's name, coordinates, " +
 			"distance and climb count, largest first, and only crags that actually hold " +
-			"climbs. Use this to answer 'what can I climb near here', then pass a returned " +
+			"climbs. " +
+			"'count' is how many crags the radius found before the nearest 20 were kept, so a " +
+			"count well above 'returned' means a narrower radius would show more of them. " +
+			"Areas are not filtered by discipline: a crag listed here may be a boulder field " +
+			"or an ice venue, and find_climbs returns roped rock routes only, so it can hold " +
+			"nothing find_climbs will return. " +
+			"Use this to answer 'what can I climb near here', then pass a returned " +
 			"uuid to get_area_details for the routes.",
 	}, tools.HandleCragsNear(gqlClient, geo.NewGazetteer()))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "find_climbs",
-		Description: "Find individual trad routes near a place, filtered by YDS grade and by " +
-			"whether they are multi-pitch. Takes the same 'place' or 'lnglat' origin as " +
-			"crags_near. minGrade and maxGrade are inclusive at the edges, so a route " +
+		Description: "Find individual roped rock routes near a place, filtered by grade, " +
+			"discipline and whether they are multi-pitch. Takes the same 'place' or 'lnglat' " +
+			"origin as crags_near. " +
+			"Grades are never converted between systems. Write minGrade and maxGrade in the " +
+			"system the crags being searched use — YDS in North America, French in France and " +
+			"Spain, UIAA in central Europe — because each crag is " +
+			"filtered in its own. A crag your bounds cannot be written in is skipped and its " +
+			"routes counted in 'skipped', so searching near Siurana for '5.10a' returns " +
+			"nothing rather than an error; British crags are never reachable, because OpenBeta " +
+			"records no British grades at all. Each route names its system in 'gradeSystem', " +
+			"since one radius can span two. Bounds are inclusive at the edges, so a route " +
 			"recorded imprecisely as '5.10' is returned for a 5.8 to 5.10b search. " +
-			"Currently trad only, and YDS only — sport routes and boulder problems are " +
-			"not returned. " +
+			"'disciplines' defaults to all of sport, trad, alpine, aid and top rope; boulder " +
+			"problems, deep water solos, ice, mixed and snow are never returned. " +
 			"The API stores no pitch count, so 'multipitch' is inferred from route length: " +
 			"'unknown' means the length was never recorded, not that the route is single " +
-			"pitch. 'cragsScanned' tells you how many crags were searched, so no results " +
-			"with a non-zero scan means the area genuinely holds nothing matching.",
+			"pitch. " +
+			"The search stops once 30 routes have matched, so 'count' is a floor rather than a " +
+			"total and crags further out may hold more; 'cragsScanned' says how far it got, so " +
+			"no results with a non-zero scan means the crags searched genuinely hold nothing " +
+			"matching.",
 	}, tools.HandleFindClimbs(gqlClient, geo.NewGazetteer()))
 
 	mcp.AddTool(server, &mcp.Tool{

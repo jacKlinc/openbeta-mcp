@@ -55,7 +55,7 @@ func TestParseYDS(t *testing.T) {
 func TestSpanOverlaps(t *testing.T) {
 	rangeLo := mustParse(t, "5.8")
 	rangeHi := mustParse(t, "5.10b")
-	want := Span{Lo: rangeLo.Lo, Hi: rangeHi.Hi}
+	want := Span{Lo: rangeLo.Lo, Hi: rangeHi.Hi, System: YDS}
 
 	tests := []struct {
 		grade string
@@ -77,8 +77,12 @@ func TestSpanOverlaps(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.grade, func(t *testing.T) {
 			got := mustParse(t, tt.grade)
-			if got.Overlaps(want) != tt.in {
-				t.Errorf("%q (%+v) in 5.8..5.10b = %v, want %v", tt.grade, got, !tt.in, tt.in)
+			in, err := got.Overlaps(want)
+			if err != nil {
+				t.Fatalf("%q: %v", tt.grade, err)
+			}
+			if in != tt.in {
+				t.Errorf("%q (%+v) in 5.8..5.10b = %v, want %v", tt.grade, got, in, tt.in)
 			}
 		})
 	}

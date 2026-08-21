@@ -1,8 +1,3 @@
-// Package grade parses and compares climbing grades.
-//
-// Only the Yosemite Decimal System for now, which is what OpenBeta populates for
-// roped climbs in North America. Other systems in GradeType (font, french, uiaa,
-// ewbank, wi) are untouched.
 package grade
 
 import (
@@ -11,24 +6,6 @@ import (
 	"strconv"
 	"strings"
 )
-
-// Span is the range a recorded grade covers.
-//
-// Many grades in the data are not a single point: "5.10" names the whole letter
-// range, "5.11a/b" straddles two, and only something like "5.10b" is exact.
-// Keeping the imprecision explicit is what lets range matching stay honest —
-// a route recorded as "5.10" genuinely might be 5.10d.
-type Span struct {
-	Lo int
-	Hi int
-}
-
-// Overlaps reports whether two spans share any ground. Range filtering uses it
-// so a route is included when any part of its grade could fall inside the
-// requested range, rather than resolving ambiguity silently in one direction.
-func (s Span) Overlaps(other Span) bool {
-	return s.Lo <= other.Hi && other.Lo <= s.Hi
-}
 
 // ordinal packs a grade into a sortable integer: number*4 + letter index.
 //
@@ -63,7 +40,7 @@ func ParseYDS(s string) (Span, error) {
 	// written. "5.9+" is still 5.9.
 	if number < 10 {
 		n := ordinal(number, 0)
-		return Span{Lo: n, Hi: n}, nil
+		return Span{Lo: n, Hi: n, System: YDS}, nil
 	}
 
 	first, second := m[2], m[3]
@@ -71,16 +48,16 @@ func ParseYDS(s string) (Span, error) {
 	case first == "":
 		// A bare "5.10" could be anything from a to d, and often is — the
 		// letter was simply never recorded.
-		return Span{Lo: ordinal(number, 0), Hi: ordinal(number, letterCount-1)}, nil
+		return Span{Lo: ordinal(number, 0), Hi: ordinal(number, letterCount-1), System: YDS}, nil
 	case second == "":
 		n := ordinal(number, letterIndex(first))
-		return Span{Lo: n, Hi: n}, nil
+		return Span{Lo: n, Hi: n, System: YDS}, nil
 	default:
 		lo, hi := letterIndex(first), letterIndex(second)
 		if lo > hi {
 			lo, hi = hi, lo
 		}
-		return Span{Lo: ordinal(number, lo), Hi: ordinal(number, hi)}, nil
+		return Span{Lo: ordinal(number, lo), Hi: ordinal(number, hi), System: YDS}, nil
 	}
 }
 

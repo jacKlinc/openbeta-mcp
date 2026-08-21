@@ -174,3 +174,57 @@ func TestCragsNearTotalFanOutFailureIsAnError(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// The schema told the model count "may exceed the crags array", and the code
+// set it after truncating, so it never could. A model cannot tell twenty crags
+// nearby from five hundred, and that was the number meant to tell it.
+func TestCragsNearCountsBeforeTheCap(t *testing.T) {
+	t.Run("count exceeds the cap", func(t *testing.T) {
+		var uuids []string
+		for i := 0; i < MaxCrags+5; i++ {
+			uuids = append(uuids, "c"+itoa(i))
+		}
+		gql, _ := routingStub(t, nearBody(uuids...), func(uuid string) (string, bool) {
+			return detailBody(uuid, 3), false
+		})
+
+		_, out, err := HandleCragsNear(gql, geo.NewGazetteer())(context.Background(), nil,
+			CragsNearArgs{Place: "Squamish"})
+		if err != nil {
+			t.Fatalf("crags_near: %v", err)
+		}
+		if out.Count != len(uuids) {
+			t.Errorf("Count = %d, want %d — the radius found that many", out.Count, len(uuids))
+		}
+		if out.Returned != MaxCrags || len(out.Crags) != MaxCrags {
+			t.Errorf("Returned = %d with %d crags, want %d of each", out.Returned, len(out.Crags), MaxCrags)
+		}
+		if out.Count <= out.Returned {
+			t.Error("Count must be able to exceed Returned; that gap is the whole signal")
+		}
+	})
+
+	t.Run("count includes crags holding nothing", func(t *testing.T) {
+		// Documented as an upper bound for exactly this reason: the count is
+		// taken before the climb filter, so it counts crags a caller will never
+		// see. An imprecise number honestly described beats a precise wrong one.
+		gql, _ := routingStub(t, nearBody("a", "b", "c"), func(uuid string) (string, bool) {
+			if uuid == "b" {
+				return detailBody(uuid, 0), false
+			}
+			return detailBody(uuid, 4), false
+		})
+
+		_, out, err := HandleCragsNear(gql, geo.NewGazetteer())(context.Background(), nil,
+			CragsNearArgs{Place: "Squamish"})
+		if err != nil {
+			t.Fatalf("crags_near: %v", err)
+		}
+		if out.Count != 3 {
+			t.Errorf("Count = %d, want 3", out.Count)
+		}
+		if out.Returned != 2 {
+			t.Errorf("Returned = %d, want 2 — the empty crag is dropped from the array", out.Returned)
+		}
+	})
+}
