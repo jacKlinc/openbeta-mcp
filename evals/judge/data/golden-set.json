@@ -1,0 +1,1483 @@
+[
+    {
+        "id": "routes_beginner_toprope_001",
+        "category": "beginner",
+        "subcategory": "top_rope",
+        "user_query": "I'm taking a group of mostly beginners climbing outside for the first time. I'm leading and want somewhere where I can set up a top rope. Ideally a single-pitch area with a short approach.",
+        "context": {
+            "climbing_experience": "mostly beginners",
+            "leader_experience": "experienced enough to lead and set up a top rope",
+            "area_familiarity": "unknown",
+            "style": "top_rope",
+            "grade_range": "beginner",
+            "pitch_count": 1,
+            "approach": "short",
+            "party_type": "group",
+            "goal": "introduce beginners to outdoor climbing"
+        },
+        "hard_constraints": [
+            "suitable for top roping",
+            "single pitch",
+            "short approach",
+            "appropriate for beginners"
+        ],
+        "soft_constraints": [
+            "easy logistics",
+            "suitable for a group"
+        ],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [
+                "get_ticks"
+            ],
+            "forbidden": [],
+            "parameter_assertions": [
+                {
+                    "tool": "find_climbs",
+                    "assert": {
+                        "pitches": 1,
+                        "difficulty": "beginner",
+                        "style": "top_rope"
+                    }
+                }
+            ]
+        },
+        "expected_behavior": {
+            "must": [
+                "Recommend areas or routes appropriate for a group of beginners",
+                "Prioritize top-rope suitability",
+                "Consider the least experienced climbers in the group",
+                "Mention approach characteristics"
+            ],
+            "should": [
+                "Explain why the recommendations fit a beginner group",
+                "Prefer straightforward logistics"
+            ],
+            "must_not": [
+                "Recommend routes that require leading",
+                "Optimize primarily for the experienced leader rather than the beginners"
+            ]
+        },
+        "judge_dimensions": [
+            "constraint_following",
+            "tool_selection",
+            "tool_parameter_accuracy",
+            "recommendation_quality",
+            "party_awareness",
+            "explanation"
+        ],
+        "difficulty": "easy",
+        "tags": [
+            "beginner",
+            "top_rope",
+            "group",
+            "single_pitch",
+            "short_approach"
+        ]
+    },
+    {
+        "id": "routes_beginner_sport_firstlead_001",
+        "category": "beginner",
+        "subcategory": "first_sport_lead",
+        "user_query": "I'm pretty new to climbing outside and want to do my first outdoor lead. Something easy, maybe 5.6 or 5.7, and preferably a single pitch.",
+        "context": {
+            "climbing_experience": "new to outdoor climbing",
+            "lead_experience": "first outdoor lead",
+            "area_familiarity": "unknown",
+            "style": "sport",
+            "grade_range": "5.5-5.7",
+            "pitch_count": 1,
+            "goal": "first outdoor sport lead"
+        },
+        "hard_constraints": [
+            "sport climbing",
+            "single pitch",
+            "easy grade",
+            "appropriate for a first outdoor lead"
+        ],
+        "soft_constraints": [
+            "5.6-5.7 preferred",
+            "straightforward route",
+            "low commitment"
+        ],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": [
+                {
+                    "tool": "find_climbs",
+                    "assert": {
+                        "style": "sport",
+                        "pitches": 1,
+                        "max_grade": "5.7"
+                    }
+                }
+            ]
+        },
+        "expected_behavior": {
+            "must": [
+                "Recommend routes appropriate for a first outdoor lead",
+                "Respect the requested grade and pitch count",
+                "Consider factors beyond grade where route data supports them"
+            ],
+            "should": [
+                "Prefer straightforward protection and logistics",
+                "Explain why the route is appropriate for a first lead"
+            ],
+            "must_not": [
+                "Assume that any 5.7 is automatically suitable for a first outdoor lead",
+                "Recommend substantially harder routes without explaining the tradeoff"
+            ]
+        },
+        "judge_dimensions": [
+            "constraint_following",
+            "tool_selection",
+            "tool_parameter_accuracy",
+            "climbing_context_reasoning",
+            "recommendation_quality",
+            "explanation"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "beginner",
+            "sport",
+            "first_lead",
+            "single_pitch",
+            "grade"
+        ]
+    },
+    {
+        "id": "routes_beginner_trad_firstlead_001",
+        "category": "beginner",
+        "subcategory": "first_trad_lead",
+        "user_query": "I'm new to trad and want something very easy for my first lead where I can practice placing gear. Ideally a single pitch around 5.5 or 5.6.",
+        "context": {
+            "climbing_experience": "new to trad",
+            "lead_experience": "first trad lead",
+            "area_familiarity": "unknown",
+            "style": "trad",
+            "grade_range": "5.5-5.6",
+            "pitch_count": 1,
+            "goal": "learn to place gear while leading"
+        },
+        "hard_constraints": [
+            "trad climbing",
+            "single pitch",
+            "very easy grade",
+            "appropriate for a first trad lead",
+            "suitable for practicing gear placement"
+        ],
+        "soft_constraints": [
+            "5.5-5.6 preferred",
+            "straightforward protection",
+            "low commitment"
+        ],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": [
+                {
+                    "tool": "find_climbs",
+                    "assert": {
+                        "style": "trad",
+                        "pitches": 1,
+                        "max_grade": "5.6"
+                    }
+                }
+            ]
+        },
+        "expected_behavior": {
+            "must": [
+                "Prioritize suitability for a first trad lead",
+                "Consider protection quality and gear-placement opportunities if available",
+                "Respect the requested grade and pitch count"
+            ],
+            "should": [
+                "Prefer straightforward, well-protected routes",
+                "Explain why the route is suitable for learning trad"
+            ],
+            "must_not": [
+                "Select purely on grade",
+                "Assume an easy grade means easy trad protection",
+                "Recommend complex multi-pitch routes"
+            ]
+        },
+        "judge_dimensions": [
+            "constraint_following",
+            "tool_selection",
+            "tool_parameter_accuracy",
+            "climbing_context_reasoning",
+            "recommendation_quality",
+            "explanation"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "beginner",
+            "trad",
+            "first_lead",
+            "gear_placement",
+            "single_pitch"
+        ]
+    },
+    {
+        "id": "routes_intermediate_firstproject_001",
+        "category": "intermediate",
+        "subcategory": "first_project",
+        "user_query": "I've been leading outside for a while and want to find a route to project. What should I try?",
+        "context": {
+            "climbing_experience": "experienced outdoor leader",
+            "lead_experience": "intermediate",
+            "area_familiarity": "unknown",
+            "style": "unspecified",
+            "grade_range": "unspecified",
+            "pitch_count": "unspecified",
+            "goal": "find a project"
+        },
+        "hard_constraints": [],
+        "soft_constraints": [
+            "route suitable for projecting"
+        ],
+        "tool_expectations": {
+            "required": [],
+            "preferred": [],
+            "optional": [
+                "find_climbs"
+            ],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Recognize that important information is missing"
+            ],
+            "should": [
+                "Ask clarifying questions about preferred style, grade, pitch count, and possibly area or commitment",
+                "Avoid prematurely narrowing the search"
+            ],
+            "must_not": [
+                "Invent a grade or style preference",
+                "Immediately recommend an arbitrary route without clarification"
+            ]
+        },
+        "judge_dimensions": [
+            "clarification",
+            "ambiguity_handling",
+            "tool_selection",
+            "user_intent_understanding"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "intermediate",
+            "project",
+            "ambiguous",
+            "clarification"
+        ]
+    },
+    {
+        "id": "routes_intermediate_local_obscure_001",
+        "category": "intermediate",
+        "subcategory": "lesser_climbed_area",
+        "user_query": "I've climbed most of the obvious classics around here. What are some less-climbed areas I might not have checked out?",
+        "context": {
+            "climbing_experience": "experienced outdoor climber",
+            "area_familiarity": "local",
+            "style": "unspecified",
+            "grade_range": "unspecified",
+            "pitch_count": "unspecified",
+            "goal": "discover less-climbed areas"
+        },
+        "hard_constraints": [
+            "recommend areas rather than only obvious classics",
+            "favor less-climbed options"
+        ],
+        "soft_constraints": [
+            "interesting or high-quality climbing",
+            "within the local area"
+        ],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [
+                "get_ticks"
+            ],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Interpret the user as already familiar with the obvious local recommendations",
+                "Favor lesser-known or less-climbed areas",
+                "Use popularity information when available"
+            ],
+            "should": [
+                "Use get_ticks or equivalent popularity information to distinguish heavily climbed from less-climbed areas",
+                "Explain why each recommendation is less obvious"
+            ],
+            "must_not": [
+                "Simply return the most popular local classics",
+                "Treat the user as a newcomer to the area"
+            ]
+        },
+        "judge_dimensions": [
+            "user_context_understanding",
+            "tool_selection",
+            "getticks_usage",
+            "ranking",
+            "recommendation_quality"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "intermediate",
+            "local",
+            "obscure",
+            "get_ticks",
+            "popularity"
+        ]
+    },
+    {
+        "id": "routes_trad_chief_all_day_001",
+        "category": "advanced",
+        "subcategory": "multi_pitch_linkup",
+        "user_query": "I'm looking for an all-day adventure on the Chief where we can link several multi-pitch climbs.",
+        "context": {
+            "climbing_experience": "experienced",
+            "area_familiarity": "unknown",
+            "location": "The Chief",
+            "style": "trad",
+            "grade_range": "unspecified",
+            "pitch_count": "multi-pitch",
+            "goal": "all-day adventure",
+            "route_structure": "multiple linked climbs",
+            "commitment": "full day"
+        },
+        "hard_constraints": [
+            "The Chief",
+            "multi-pitch",
+            "suitable for linking multiple climbs",
+            "appropriate for an all-day outing"
+        ],
+        "soft_constraints": [
+            "adventurous",
+            "efficient linkup",
+            "interesting climbing"
+        ],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [
+                "get_ticks"
+            ],
+            "forbidden": [],
+            "parameter_assertions": [
+                {
+                    "tool": "find_climbs",
+                    "assert": {
+                        "location": "The Chief",
+                        "pitches": "multi-pitch",
+                        "style": "trad"
+                    }
+                }
+            ]
+        },
+        "expected_behavior": {
+            "must": [
+                "Treat this as a multi-route planning problem rather than a single-route recommendation",
+                "Identify routes that can plausibly be combined",
+                "Consider pitch count, approach, descent, and overall commitment where data supports them"
+            ],
+            "should": [
+                "Explain the proposed sequence or linkup",
+                "Identify logistical dependencies between climbs"
+            ],
+            "must_not": [
+                "Return only one unrelated multi-pitch route",
+                "Ignore the all-day and linking requirements"
+            ]
+        },
+        "judge_dimensions": [
+            "multi_step_reasoning",
+            "tool_selection",
+            "tool_parameter_accuracy",
+            "constraint_following",
+            "route_composition",
+            "recommendation_quality"
+        ],
+        "difficulty": "hard",
+        "tags": [
+            "advanced",
+            "trad",
+            "multi_pitch",
+            "chief",
+            "linkup",
+            "multi_step"
+        ]
+    },
+    {
+        "id": "routes_advanced_newcomer_classics_001",
+        "category": "advanced",
+        "subcategory": "hard_classics",
+        "user_query": "I'm new to the area but climb 5.11+ and want to get on some of the hard classics.",
+        "context": {
+            "climbing_experience": "advanced",
+            "area_familiarity": "newcomer",
+            "style": "unspecified",
+            "grade_range": "5.11+",
+            "pitch_count": "unspecified",
+            "goal": "climb hard classics"
+        },
+        "hard_constraints": [
+            "appropriate for 5.11+ climber",
+            "classic/high-quality routes",
+            "appropriate for someone new to the area"
+        ],
+        "soft_constraints": [
+            "well-known classics",
+            "manageable logistics for a newcomer"
+        ],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [
+                "get_ticks"
+            ],
+            "forbidden": [],
+            "parameter_assertions": [
+                {
+                    "tool": "find_climbs",
+                    "assert": {
+                        "min_grade": "5.11"
+                    }
+                }
+            ]
+        },
+        "expected_behavior": {
+            "must": [
+                "Interpret newcomer as unfamiliar with the area, not as a beginner climber",
+                "Prioritize hard classics",
+                "Respect the 5.11+ ability level"
+            ],
+            "should": [
+                "Provide enough area/context information for someone unfamiliar with the area",
+                "Explain why the routes are considered classics"
+            ],
+            "must_not": [
+                "Recommend beginner routes because the user is new to the area",
+                "Ignore the 5.11+ requirement"
+            ]
+        },
+        "judge_dimensions": [
+            "context_disambiguation",
+            "constraint_following",
+            "tool_selection",
+            "recommendation_quality",
+            "explanation"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "advanced",
+            "newcomer",
+            "hard",
+            "classics",
+            "area_familiarity"
+        ]
+    },
+    {
+        "id": "routes_ambiguous_001",
+        "category": "discovery",
+        "subcategory": "ambiguous_query",
+        "user_query": "Where should I climb tomorrow?",
+        "context": {
+            "climbing_experience": "unknown",
+            "area_familiarity": "unknown",
+            "style": "unknown",
+            "grade_range": "unknown",
+            "pitch_count": "unknown",
+            "goal": "unknown",
+            "date": "tomorrow"
+        },
+        "hard_constraints": [],
+        "soft_constraints": [],
+        "tool_expectations": {
+            "required": [],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Recognize that there is insufficient information to make a useful recommendation"
+            ],
+            "should": [
+                "Ask concise clarifying questions about ability, style, desired difficulty, location, and commitment"
+            ],
+            "must_not": [
+                "Blindly search and recommend arbitrary routes",
+                "Invent user preferences"
+            ]
+        },
+        "judge_dimensions": [
+            "clarification",
+            "ambiguity_handling",
+            "user_intent_understanding",
+            "tool_selection"
+        ],
+        "difficulty": "easy",
+        "tags": [
+            "ambiguous",
+            "clarification",
+            "discovery"
+        ]
+    },
+    {
+        "id": "routes_conflicting_constraints_001",
+        "category": "constraint_handling",
+        "subcategory": "conflicting_constraints",
+        "user_query": "I'm looking for a 5.6 multi-pitch sport route that's less than a 10-minute walk from the car.",
+        "context": {
+            "climbing_experience": "unknown",
+            "area_familiarity": "unknown",
+            "style": "sport",
+            "grade_range": "5.6",
+            "pitch_count": "multi-pitch",
+            "approach": "under 10 minutes",
+            "goal": "find a route satisfying all constraints"
+        },
+        "hard_constraints": [
+            "sport",
+            "5.6",
+            "multi-pitch",
+            "approach under 10 minutes"
+        ],
+        "soft_constraints": [],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": [
+                {
+                    "tool": "find_climbs",
+                    "assert": {
+                        "style": "sport",
+                        "max_grade": "5.6",
+                        "pitches": "multi-pitch",
+                        "approach_max_minutes": 10
+                    }
+                }
+            ]
+        },
+        "expected_behavior": {
+            "must": [
+                "Search for routes satisfying the stated constraints",
+                "Clearly report if no exact matches exist"
+            ],
+            "should": [
+                "Offer sensible constraint relaxations if no exact match exists",
+                "Explain which constraint is being relaxed and why"
+            ],
+            "must_not": [
+                "Pretend a near-match satisfies all constraints",
+                "Silently relax constraints"
+            ]
+        },
+        "judge_dimensions": [
+            "constraint_following",
+            "constraint_relaxation",
+            "tool_parameter_accuracy",
+            "honesty",
+            "recommendation_quality"
+        ],
+        "difficulty": "hard",
+        "tags": [
+            "conflicting_constraints",
+            "no_results",
+            "constraint_relaxation"
+        ]
+    },
+    {
+        "id": "routes_impossible_constraints_001",
+        "category": "constraint_handling",
+        "subcategory": "impossible_constraints",
+        "user_query": "Find me a 5.5 trad route that's 8 pitches long and fully bolted.",
+        "context": {
+            "climbing_experience": "unknown",
+            "area_familiarity": "unknown",
+            "style": "trad",
+            "grade_range": "5.5",
+            "pitch_count": 8,
+            "protection": "fully bolted",
+            "goal": "find an exact match"
+        },
+        "hard_constraints": [
+            "trad",
+            "5.5",
+            "8 pitches",
+            "fully bolted"
+        ],
+        "soft_constraints": [],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Recognize that the constraints may be contradictory",
+                "Do not claim a route satisfies mutually inconsistent characteristics"
+            ],
+            "should": [
+                "Explain the relevant distinction between trad and fully bolted climbing",
+                "Suggest a nearby interpretation if useful"
+            ],
+            "must_not": [
+                "Fabricate an exact match",
+                "Silently reinterpret trad as sport"
+            ]
+        },
+        "judge_dimensions": [
+            "constraint_reasoning",
+            "domain_reasoning",
+            "honesty",
+            "tool_selection"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "impossible_constraints",
+            "trad",
+            "sport",
+            "domain_knowledge"
+        ]
+    },
+    {
+        "id": "routes_gym_to_outdoor_001",
+        "category": "beginner",
+        "subcategory": "gym_to_outdoor",
+        "user_query": "I climb 5.10 at the gym but have never climbed outside. Where should I start?",
+        "context": {
+            "climbing_experience": "gym climber",
+            "outdoor_experience": "none",
+            "gym_grade": "5.10",
+            "area_familiarity": "unknown",
+            "style": "unknown",
+            "goal": "start outdoor climbing"
+        },
+        "hard_constraints": [
+            "appropriate for someone with no outdoor experience"
+        ],
+        "soft_constraints": [
+            "may be comfortable climbing around 5.10 indoors"
+        ],
+        "tool_expectations": {
+            "required": [],
+            "preferred": [],
+            "optional": [
+                "find_climbs"
+            ],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Distinguish indoor climbing grade from outdoor readiness",
+                "Consider outdoor-specific skills and logistics"
+            ],
+            "should": [
+                "Ask about desired style or recommend an introductory option rather than directly mapping 5.10 gym to 5.10 outdoor"
+            ],
+            "must_not": [
+                "Assume the user is ready for 5.10 outdoor climbing solely from gym experience"
+            ]
+        },
+        "judge_dimensions": [
+            "context_reasoning",
+            "safety_context",
+            "clarification",
+            "recommendation_quality"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "gym",
+            "outdoor",
+            "grade_transfer",
+            "beginner"
+        ]
+    },
+    {
+        "id": "routes_firstlead_grade_trap_001",
+        "category": "beginner",
+        "subcategory": "first_lead_grade_trap",
+        "user_query": "I want my first outdoor lead. Give me the easiest route you can find.",
+        "context": {
+            "climbing_experience": "unknown",
+            "outdoor_lead_experience": "first lead",
+            "style": "unknown",
+            "grade_range": "easiest available",
+            "pitch_count": "unknown",
+            "goal": "first outdoor lead"
+        },
+        "hard_constraints": [
+            "appropriate for a first outdoor lead"
+        ],
+        "soft_constraints": [
+            "easy climbing",
+            "low commitment"
+        ],
+        "tool_expectations": {
+            "required": [],
+            "preferred": [
+                "find_climbs"
+            ],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Interpret suitability for a first lead as more important than absolute minimum grade"
+            ],
+            "should": [
+                "Consider protection, route-finding, exposure, approach, descent, and logistics where available",
+                "Ask for style if necessary"
+            ],
+            "must_not": [
+                "Simply choose the lowest-grade route",
+                "Equate easiest grade with easiest first lead"
+            ]
+        },
+        "judge_dimensions": [
+            "climbing_context_reasoning",
+            "constraint_prioritization",
+            "clarification",
+            "recommendation_quality"
+        ],
+        "difficulty": "hard",
+        "tags": [
+            "first_lead",
+            "grade_trap",
+            "domain_reasoning"
+        ]
+    },
+    {
+        "id": "routes_avoid_crowds_001",
+        "category": "intermediate",
+        "subcategory": "avoid_crowds",
+        "user_query": "I don't care about climbing something famous. I'd rather avoid crowds.",
+        "context": {
+            "climbing_experience": "intermediate",
+            "area_familiarity": "unknown",
+            "style": "unknown",
+            "grade_range": "unknown",
+            "goal": "avoid crowds"
+        },
+        "hard_constraints": [
+            "favor lower-popularity options"
+        ],
+        "soft_constraints": [
+            "quality climbing",
+            "interesting routes"
+        ],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [
+                "get_ticks"
+            ],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Treat crowd avoidance as a meaningful ranking preference",
+                "Use popularity data when available"
+            ],
+            "should": [
+                "Prefer less-ticked routes or areas",
+                "Explain the popularity tradeoff"
+            ],
+            "must_not": [
+                "Recommend only famous/highly popular routes"
+            ]
+        },
+        "judge_dimensions": [
+            "tool_selection",
+            "getticks_usage",
+            "ranking",
+            "user_intent_understanding"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "get_ticks",
+            "popularity",
+            "crowds",
+            "ranking"
+        ]
+    },
+    {
+        "id": "routes_most_climbed_001",
+        "category": "discovery",
+        "subcategory": "popularity_search",
+        "user_query": "What are the most climbed 5.10 sport routes in the area?",
+        "context": {
+            "climbing_experience": "unknown",
+            "area_familiarity": "unknown",
+            "style": "sport",
+            "grade_range": "5.10",
+            "goal": "find most climbed routes",
+            "ranking_dimension": "popularity"
+        },
+        "hard_constraints": [
+            "sport",
+            "5.10",
+            "ranked by climbing popularity"
+        ],
+        "soft_constraints": [],
+        "tool_expectations": {
+            "required": [
+                "find_climbs",
+                "get_ticks"
+            ],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": [
+                {
+                    "tool": "find_climbs",
+                    "assert": {
+                        "style": "sport",
+                        "grade": "5.10"
+                    }
+                },
+                {
+                    "tool": "get_ticks",
+                    "assert": {
+                        "used_for": "popularity_ranking"
+                    }
+                }
+            ]
+        },
+        "expected_behavior": {
+            "must": [
+                "Use popularity information to rank candidates",
+                "Respect sport and grade constraints"
+            ],
+            "should": [
+                "Explain that ticks are being used as a popularity signal if appropriate"
+            ],
+            "must_not": [
+                "Rank solely by route quality or fame without considering popularity"
+            ]
+        },
+        "judge_dimensions": [
+            "tool_selection",
+            "getticks_usage",
+            "tool_parameter_accuracy",
+            "ranking",
+            "constraint_following"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "get_ticks",
+            "popularity",
+            "ranking",
+            "sport",
+            "grade"
+        ]
+    },
+    {
+        "id": "routes_classic_not_crowded_001",
+        "category": "intermediate",
+        "subcategory": "classic_low_popularity",
+        "user_query": "Give me three classic 5.9s that aren't the usual crowded recommendations.",
+        "context": {
+            "climbing_experience": "intermediate",
+            "area_familiarity": "familiar",
+            "style": "unspecified",
+            "grade_range": "5.9",
+            "goal": "find classic routes while avoiding crowds",
+            "ranking_dimensions": [
+                "classic_quality",
+                "low_popularity"
+            ]
+        },
+        "hard_constraints": [
+            "5.9",
+            "classic/high-quality",
+            "avoid the most crowded recommendations"
+        ],
+        "soft_constraints": [],
+        "tool_expectations": {
+            "required": [
+                "find_climbs",
+                "get_ticks"
+            ],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Balance route quality/classic status with lower popularity",
+                "Return approximately three strong candidates"
+            ],
+            "should": [
+                "Use popularity data to avoid the obvious crowded classics",
+                "Explain the tradeoff between classic status and popularity"
+            ],
+            "must_not": [
+                "Return the three most popular 5.9s",
+                "Treat popularity as the only ranking criterion"
+            ]
+        },
+        "judge_dimensions": [
+            "multi_objective_ranking",
+            "tool_selection",
+            "getticks_usage",
+            "recommendation_quality",
+            "constraint_following"
+        ],
+        "difficulty": "hard",
+        "tags": [
+            "get_ticks",
+            "classic",
+            "popularity",
+            "multi_objective",
+            "ranking"
+        ]
+    },
+    {
+        "id": "routes_half_day_multipitch_001",
+        "category": "intermediate",
+        "subcategory": "commitment_mismatch",
+        "user_query": "I want a 5.8 multi-pitch, but I only have half a day.",
+        "context": {
+            "climbing_experience": "intermediate",
+            "area_familiarity": "unknown",
+            "style": "unspecified",
+            "grade_range": "5.8",
+            "pitch_count": "multi-pitch",
+            "available_time": "half day",
+            "goal": "multi-pitch climb"
+        },
+        "hard_constraints": [
+            "5.8",
+            "multi-pitch",
+            "fits within half a day"
+        ],
+        "soft_constraints": [
+            "interesting climbing",
+            "manageable approach and descent"
+        ],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": [
+                {
+                    "tool": "find_climbs",
+                    "assert": {
+                        "grade": "5.8",
+                        "pitches": "multi-pitch"
+                    }
+                }
+            ]
+        },
+        "expected_behavior": {
+            "must": [
+                "Consider total commitment rather than pitch count alone",
+                "Account for approach, route duration, and descent where data supports them"
+            ],
+            "should": [
+                "Prefer shorter multi-pitch outings",
+                "Explain expected time commitment"
+            ],
+            "must_not": [
+                "Recommend a long route simply because it is 5.8 multi-pitch"
+            ]
+        },
+        "judge_dimensions": [
+            "constraint_following",
+            "commitment_reasoning",
+            "tool_selection",
+            "recommendation_quality"
+        ],
+        "difficulty": "hard",
+        "tags": [
+            "multi_pitch",
+            "time_constraint",
+            "commitment",
+            "intermediate"
+        ]
+    },
+    {
+        "id": "routes_short_approach_001",
+        "category": "constraint_handling",
+        "subcategory": "approach_constraint",
+        "user_query": "I can't do a long approach. What are my options?",
+        "context": {
+            "climbing_experience": "unknown",
+            "area_familiarity": "unknown",
+            "style": "unknown",
+            "grade_range": "unknown",
+            "approach": "short required",
+            "goal": "find accessible climbing"
+        },
+        "hard_constraints": [
+            "short or minimal approach"
+        ],
+        "soft_constraints": [],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": [
+                {
+                    "tool": "find_climbs",
+                    "assert": {
+                        "approach": "short"
+                    }
+                }
+            ]
+        },
+        "expected_behavior": {
+            "must": [
+                "Treat approach length as a meaningful constraint",
+                "Prioritize routes with short approaches"
+            ],
+            "should": [
+                "Ask about other preferences if needed",
+                "State approach characteristics for recommendations"
+            ],
+            "must_not": [
+                "Recommend routes with long approaches without clearly flagging the mismatch"
+            ]
+        },
+        "judge_dimensions": [
+            "constraint_following",
+            "tool_parameter_accuracy",
+            "recommendation_quality"
+        ],
+        "difficulty": "easy",
+        "tags": [
+            "approach",
+            "accessibility",
+            "constraint"
+        ]
+    },
+    {
+        "id": "routes_mixed_ability_party_001",
+        "category": "beginner",
+        "subcategory": "mixed_ability_group",
+        "user_query": "I'm climbing with two strong 5.11 climbers and one person who has never climbed outside. What should we do?",
+        "context": {
+            "climbing_experience": "mixed",
+            "party_experience": [
+                "two strong 5.11 climbers",
+                "one outdoor beginner"
+            ],
+            "area_familiarity": "unknown",
+            "style": "unknown",
+            "goal": "choose activity suitable for entire group"
+        },
+        "hard_constraints": [
+            "suitable for the least experienced participant"
+        ],
+        "soft_constraints": [
+            "interesting enough for stronger climbers",
+            "group-friendly"
+        ],
+        "tool_expectations": {
+            "required": [],
+            "preferred": [],
+            "optional": [
+                "find_climbs"
+            ],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Recognize the group has substantially different experience levels",
+                "Avoid optimizing exclusively for the two strongest climbers",
+                "Recommend an activity that can reasonably accommodate the beginner"
+            ],
+            "should": [
+                "Explain how the stronger climbers can participate while keeping the activity beginner-appropriate"
+            ],
+            "must_not": [
+                "Recommend a 5.11 route simply because two members climb 5.11"
+            ]
+        },
+        "judge_dimensions": [
+            "party_awareness",
+            "constraint_prioritization",
+            "recommendation_quality",
+            "climbing_context_reasoning"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "mixed_ability",
+            "group",
+            "beginner",
+            "party_constraints"
+        ]
+    },
+    {
+        "id": "routes_local_experienced_001",
+        "category": "intermediate",
+        "subcategory": "local_context",
+        "user_query": "I've climbed all the obvious classics around here. Don't give me the usual recommendations.",
+        "context": {
+            "climbing_experience": "experienced",
+            "area_familiarity": "expert/local",
+            "style": "unspecified",
+            "grade_range": "unspecified",
+            "goal": "discover less-obvious climbing"
+        },
+        "hard_constraints": [
+            "avoid obvious classics"
+        ],
+        "soft_constraints": [
+            "interesting",
+            "lesser-known",
+            "high quality"
+        ],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [
+                "get_ticks"
+            ],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Use the user's local expertise to change the recommendation strategy",
+                "Avoid defaulting to the most famous routes"
+            ],
+            "should": [
+                "Use popularity/tick information where available",
+                "Favor less-obvious alternatives"
+            ],
+            "must_not": [
+                "Return the standard tourist/classic recommendations"
+            ]
+        },
+        "judge_dimensions": [
+            "user_context_understanding",
+            "ranking",
+            "getticks_usage",
+            "recommendation_quality"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "local",
+            "expert",
+            "obscure",
+            "get_ticks"
+        ]
+    },
+    {
+        "id": "routes_newcomer_classics_contrast_001",
+        "category": "advanced",
+        "subcategory": "newcomer_vs_local",
+        "user_query": "I'm visiting the area for the first time. What are the classics I shouldn't miss?",
+        "context": {
+            "climbing_experience": "unknown",
+            "area_familiarity": "newcomer",
+            "style": "unknown",
+            "grade_range": "unknown",
+            "goal": "experience classic local climbing"
+        },
+        "hard_constraints": [
+            "appropriate for a newcomer to the area",
+            "prioritize classics"
+        ],
+        "soft_constraints": [
+            "high-quality",
+            "representative of the area"
+        ],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [
+                "get_ticks"
+            ],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Prioritize classic and representative routes",
+                "Account for the user's lack of local familiarity"
+            ],
+            "should": [
+                "Provide useful contextual information about the area and route logistics"
+            ],
+            "must_not": [
+                "Optimize for obscure routes merely because they are less popular"
+            ]
+        },
+        "judge_dimensions": [
+            "user_context_understanding",
+            "recommendation_quality",
+            "area_context",
+            "ranking"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "newcomer",
+            "classics",
+            "area_familiarity",
+            "contrast_case"
+        ]
+    },
+    {
+        "id": "routes_no_results_001",
+        "category": "failure_handling",
+        "subcategory": "no_matching_routes",
+        "user_query": "I want a single-pitch 5.5 sport route with a five-minute approach and no crowds.",
+        "context": {
+            "climbing_experience": "unknown",
+            "area_familiarity": "unknown",
+            "style": "sport",
+            "grade_range": "5.5",
+            "pitch_count": 1,
+            "approach": "five minutes or less",
+            "popularity": "low",
+            "goal": "find exact match"
+        },
+        "hard_constraints": [
+            "single pitch",
+            "5.5",
+            "sport",
+            "approach <= 5 minutes",
+            "low popularity"
+        ],
+        "soft_constraints": [],
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [
+                "get_ticks"
+            ],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Determine whether any exact matches exist",
+                "Clearly state when no exact match exists"
+            ],
+            "should": [
+                "Offer the closest alternatives and identify which constraint each one relaxes"
+            ],
+            "must_not": [
+                "Invent a route that satisfies the constraints",
+                "Silently relax constraints"
+            ]
+        },
+        "judge_dimensions": [
+            "no_result_handling",
+            "constraint_following",
+            "getticks_usage",
+            "honesty",
+            "constraint_relaxation"
+        ],
+        "difficulty": "hard",
+        "tags": [
+            "no_results",
+            "getticks",
+            "constraint_relaxation",
+            "failure_handling"
+        ]
+    },
+    {
+        "id": "routes_tool_failure_001",
+        "category": "failure_handling",
+        "subcategory": "tool_error",
+        "user_query": "Find me a beginner-friendly single-pitch sport route with a short approach.",
+        "context": {
+            "climbing_experience": "beginner",
+            "style": "sport",
+            "pitch_count": 1,
+            "approach": "short",
+            "goal": "find beginner route"
+        },
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "simulated_tool_behavior": {
+                "find_climbs": "error_or_timeout"
+            }
+        },
+        "expected_behavior": {
+            "must": [
+                "Do not fabricate search results",
+                "Acknowledge that the route search failed"
+            ],
+            "should": [
+                "Retry if appropriate",
+                "Use another valid tool if it can independently satisfy the request"
+            ],
+            "must_not": [
+                "Present made-up routes as search results",
+                "Claim that the search succeeded"
+            ]
+        },
+        "judge_dimensions": [
+            "failure_handling",
+            "honesty",
+            "tool_recovery",
+            "hallucination_resistance"
+        ],
+        "difficulty": "medium",
+        "tags": [
+            "tool_failure",
+            "retry",
+            "hallucination",
+            "failure_handling"
+        ]
+    },
+    {
+        "id": "routes_partial_metadata_001",
+        "category": "failure_handling",
+        "subcategory": "missing_metadata",
+        "user_query": "Find me an easy multi-pitch route with a short approach and straightforward protection.",
+        "context": {
+            "climbing_experience": "intermediate",
+            "style": "trad",
+            "grade_range": "easy",
+            "pitch_count": "multi-pitch",
+            "approach": "short",
+            "protection": "straightforward",
+            "goal": "find suitable multi-pitch route"
+        },
+        "tool_expectations": {
+            "required": [
+                "find_climbs"
+            ],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "simulated_tool_behavior": {
+                "find_climbs": "returns_candidates_with_missing_protection_or_approach_metadata"
+            }
+        },
+        "expected_behavior": {
+            "must": [
+                "Recognize which constraints cannot be verified from the returned data"
+            ],
+            "should": [
+                "Retrieve additional information if another tool can provide it",
+                "Clearly distinguish verified facts from assumptions"
+            ],
+            "must_not": [
+                "Assume missing metadata means the constraint is satisfied",
+                "Present unverified protection or approach information as fact"
+            ]
+        },
+        "judge_dimensions": [
+            "missing_data_handling",
+            "tool_selection",
+            "honesty",
+            "constraint_verification"
+        ],
+        "difficulty": "hard",
+        "tags": [
+            "partial_data",
+            "missing_metadata",
+            "verification",
+            "failure_handling"
+        ]
+    },
+    {
+        "id": "routes_out_of_scope_001",
+        "category": "scope",
+        "subcategory": "unsupported_request",
+        "user_query": "What's the best climbing shoe for this route?",
+        "context": {
+            "climbing_experience": "unknown",
+            "area_familiarity": "unknown",
+            "goal": "equipment recommendation",
+            "mcp_scope": "route discovery"
+        },
+        "hard_constraints": [],
+        "soft_constraints": [],
+        "tool_expectations": {
+            "required": [],
+            "preferred": [],
+            "optional": [],
+            "forbidden": [],
+            "parameter_assertions": []
+        },
+        "expected_behavior": {
+            "must": [
+                "Recognize that route data does not directly answer the equipment question"
+            ],
+            "should": [
+                "State the scope limitation",
+                "If broader system capabilities exist, hand off appropriately"
+            ],
+            "must_not": [
+                "Pretend that route information determines the best climbing shoe",
+                "Invent equipment specifications from route data"
+            ]
+        },
+        "judge_dimensions": [
+            "scope_awareness",
+            "honesty",
+            "tool_selection",
+            "user_intent_understanding"
+        ],
+        "difficulty": "easy",
+        "tags": [
+            "out_of_scope",
+            "scope_awareness",
+            "equipment"
+        ]
+    }
+]
