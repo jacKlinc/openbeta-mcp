@@ -1,535 +1,329 @@
 # Golden Set
 
 TODO:
-- [ ] Fit to tools with Claude
-- [ ] Enforce difficulty to numbers. Normalise to 5.5-12?
+- [ ] `get_ticks` cases, once the tool exists. Nothing here references it today.
+- [ ] Fault-injection cases, once a transport wrapper exists that can fail a named
+      tool call or strip fields from a real response. Two were drafted and dropped
+      rather than parked in a second file: the set holds cases that run today.
+      Note the protection half of the missing-metadata case is already covered
+      without fault injection by `trad_first_lead_gunks`, which grades the same
+      behaviour against genuinely absent data.
+- [ ] Realign `GRADE_WINDOW` in `evals/tokens/corpus.py` (5.8-5.11a) with the
+      5.6-5.12 scope in [judge.md](../../../docs/plans/judge.md), so cost and
+      quality are measured over the same distribution.
 
 ### Questions
-1. Is "suitable for top roping" even possible to assess?
-2. "short approach" would require distance from road calc
-3. "easy logistics", "suitable for a group" -> vague
+
+Answered against the shipped tools. Kept here because the answers are the reason
+several cases are shaped the way they are.
+
+1. **Is "suitable for top roping" possible to assess?** Partly. `find_climbs`
+   takes `disciplines: ["tr"]` and `ClimbMatch.disciplines` reports it, so
+   "recorded as top-rope" is answerable. "Suitable for a top rope" — anchors,
+   whether you can walk to the top — is not in the data. `toprope_group_index`
+   grades the first and forbids the second.
+2. **"Short approach" would require distance-from-road.** It is not available and
+   cannot be computed: no tool returns approach prose, and the only geometry in a
+   response is crag lat/lng. `distanceKm` is distance from the *search origin*,
+   not from any parking, and reading it as an approach is a specific failure
+   `approach_length_joshua_tree` exists to catch.
+3. **"Easy logistics", "suitable for a group" — vague.** Unmeasurable, so they are
+   never hard requirements. They appear only in honest-failure cases, where the
+   correct behaviour is to say so.
 
 ### Ideas
 
 1. Use raster data to infer elevation?
 
-### Overview
+## Overview
 
-This directory contains the golden set for evaluating an LLM agent that interacts with the climbing MCP server.
+The golden set evaluates an agent talking to this MCP server through the three
+tools it actually exposes: `crags_near`, `find_climbs`, `get_area_details`.
 
-The set is designed to evaluate two related capabilities:
+It measures two things:
 
-Tool use — whether the agent selects and uses the MCP tools appropriately.
-Recommendation quality — whether the agent correctly understands the climber's intent, constraints, experience, and preferences and produces an appropriate response.
+- **Tool use** — does the agent pick the right tool and pass real parameters?
+- **Answer quality** — does it respect the user's constraints, and does it stay
+  inside what the data supports?
 
-The set intentionally contains both straightforward cases and adversarial cases where the correct behavior is to ask a question, relax a constraint, report no results, or handle a tool failure.
+The second half matters more than it looks. A large fraction of what climbers ask
+for is not in OpenBeta at all, and the most valuable cases here are the ones where
+the correct answer is "the data does not say".
 
-## File Format
+## Files
 
-Cases are stored as JSONL: one JSON object per line.
+| File | What it is |
+| --- | --- |
+| `golden-set.jsonl` | The cases. One JSON object per line. |
+| `manifest.json` | What the expectations are pinned to: snapshot, endpoint, versions, fingerprints. |
 
-Each case has a stable id and follows this general structure:
+JSONL rather than a JSON array or YAML, for the reason the rest of `evals/` uses
+it: `evals/tokens/sweep.py` writes JSONL, `evals/common/jsonl.py` reads it, and
+`evals/README.md` makes JSONL the source of truth with MLflow as a view. Cases can
+be added, diffed and streamed one line at a time.
 
-```json
-{
-  "id": "routes_beginner_toprope_001",
-  "category": "beginner",
-  "subcategory": "top_rope",
-  "user_query": "...",
-  "context": {},
-  "hard_constraints": [],
-  "soft_constraints": [],
-  "tool_expectations": {},
-  "expected_behavior": {},
-  "judge_dimensions": [],
-  "difficulty": "medium",
-  "tags": []
-}
+## Case fields
+
+```
+case_id           str    stable; every result row references it
+capability        str    the one thing under test; the primary slice axis
+category          str    happy_path | edge | no_data | honest_failure | no_tool_baseline
+user_input        str    the question, verbatim, in natural language
+place             str    gazetteer place the case targets, or null
+grade_range       str    e.g. "5.6-5.10a", or null
+pitch_filter      str    multipitch | any
+expected          obj    tagged on `kind`; see below
+requires_fields   list   response paths the answer depends on, e.g. "climbs[].disciplines"
+expected_tools    list   tools that should be called
+allowed_tools     list   tools that may be called; anything else is a failure
+must_include      list   substrings the answer needs
+must_not_include  list   fabrications this case is designed to catch
+criteria          list   per-case points fed to the one shared rubric
+tags              list   free-form slicing
 ```
 
-JSONL is preferred over one large JSON array because individual cases can be:
+`capability` rather than a persona is the primary key. Two beginner scenarios can
+exercise completely different capabilities, and it is the capability that a
+response-shape change breaks.
 
-Added or removed without restructuring the file
-Diffed easily in version control
-Executed independently
-Streamed into evaluation pipelines
-Assigned stable IDs for regression tracking
+**`requires_fields` is the field that makes this a trimming study.** It records
+which parts of the response the answer depends on, so you can predict which
+variants should fail before running anything. Comparing predicted failures against
+actual ones is a stronger result than a table of pass rates, and it catches the
+interesting case: a variant that passes without the data it should have needed,
+meaning the model guessed and got lucky.
 
-### Case Fields
-#### `id`
+### What is deliberately *not* a field
 
-A unique, stable identifier for the case.
+- **The model.** It belongs in the result row, keyed on `(run_id, case_id)`
+  alongside `judge_model` — see [judge.md](../../../docs/plans/judge.md).
+  `design.md` runs the same questions across two model sizes and pairs the
+  comparison; a model pinned into a case would fork the set and cost the paired
+  tests their power. `schema_version` in `manifest.json` versions the *format*.
+- **`difficulty`.** An unvalidated guess at task hardness, and not an experimental
+  variable. `category` and `capability` slice results usefully; a subjective
+  three-point scale does not.
+- **`context`.** A structured restatement of `user_input` invites grading the
+  restatement rather than the question. What matters is already in `place`,
+  `grade_range`, `pitch_filter` and `criteria`.
+- **`judge_dimensions`.** Per-case scoring dimensions mean every case has a
+  different scoring shape, so scores cannot be aggregated. One shared versioned
+  rubric plus per-case `criteria` says the same thing and stays comparable.
 
-Use descriptive IDs rather than sequential numbers alone.
+## Grading tiers
 
-`routes_beginner_trad_firstlead_001`
+From [`evals/docs/design.md`](../../docs/design.md), in order of preference. The
+judge is the last resort, not the default — most of the set has ground truth
+computable straight from the API, and reaching for a judge there adds cost,
+latency and a second source of error to something checkable with `==`.
 
+| `expected.kind` | Carries | Graded by | Used for |
+| --- | --- | --- | --- |
+| `scalar` | `query`, `generated` | Exact match | Counts, empty results |
+| `set` | `query`, `generated` | Set F1, **precision and recall reported separately** | Route and area lists |
+| `prose` | `why_not_deterministic` | Judge, on groundedness | Everything whose correctness is faithfulness |
 
-Do not change an existing ID when the wording of a case is updated unless it represents a fundamentally different test.
+`expected` is a discriminated union, so the three shapes cannot be mixed up: a
+`prose` case has no `query` to run and no value to compare, and a `set` case must
+carry a `query`. `generated` holds `value` and `args_sha` together — a case is
+either generated or it is not, and there is no state where one is present without
+the other. Every `prose` case must say in `why_not_deterministic` why it is not
+gradeable by machine, which stops the judge becoming the lazy default.
 
-#### `category`
+Precision and recall stay separate because they are different bugs: a variant that
+drops routes is a recall failure, one that invents them is a precision failure,
+and averaging hides which is happening. Area names need normalised matching —
+"The Smoke Bluffs" and "Smoke Bluffs" are not different answers.
 
-The broad evaluation category.
+The judge sees the question, the exact tool output the model had, and the answer.
+**Not** the expected value: it is checking entailment against the context, not
+correctness against the world.
 
-Examples:
+### Generating expected values
 
-beginner
-intermediate
-advanced
-constraint_handling
-discovery
-failure_handling
-scope
+Never write a `set` or `scalar` by hand — it will be wrong and it will drift.
 
-
-This should describe the primary evaluation intent, not necessarily the user's climbing ability.
-
-#### `subcategory`
-
-A more specific description of what the case tests.
-
-Examples:
-
-first_sport_lead
-first_trad_lead
-multi_pitch_linkup
-avoid_crowds
-ambiguous_query
-no_matching_routes
-tool_error
-
-#### `user_query`
-
-The actual query presented to the agent.
-
-This should be written as natural user language.
-
-Do not turn this into a structured representation of the constraints.
-
-Good:
-
-I'm pretty new to climbing outside and want to do my first lead. Something easy, maybe 5.6 or 5.7, and preferably a single pitch.
-
-Bad:
-
-experience=beginner, style=sport, grade=5.6-5.7, pitches=1
-
-
-The point is to test whether the agent can infer the relevant constraints from realistic language.
-
-#### `context`
-
-Information known to the evaluator about the scenario.
-
-This can include information that is implicit in the query but useful for evaluation:
-```json
-{
-  "climbing_experience": "new to outdoor climbing",
-  "style": "sport",
-  "grade_range": "5.5-5.7",
-  "pitch_count": 1
-}
+```
+python -m judge.groundtruth            # generate, write back
+python -m judge.groundtruth --check    # verify nothing drifted, write nothing
 ```
 
-Context should describe the scenario rather than prescribe the answer.
+`groundtruth.py` calls the real compiled binary over stdio, the same path the cost
+sweep uses, stores the generating query beside the answer, and records a
+fingerprint per case in `manifest.json`. `--check` regenerates and compares, so
+snapshot rot surfaces as a failed check rather than as a mysteriously falling
+score. It also refuses several things outright — see **Guards** below.
 
-#### `hard_constraints`
+### Configuration
 
-Requirements that should materially affect whether a recommendation is considered correct.
-
-Examples:
-```json
-[
-  "single pitch",
-  "sport climbing",
-  "appropriate for a first outdoor lead"
-]
-```
-
-Violating a hard constraint should normally result in a significant evaluation penalty.
-
-#### `soft_constraints`
-
-Preferences that should influence ranking but can reasonably be traded off.
-
-For example:
-```json
-[
-  "short approach",
-  "low commitment",
-  "5.6-5.7 preferred"
-]
-```
-
-The distinction between hard and soft constraints is important.
-
-An agent should not fail merely because it recommends a slightly less ideal route when no route satisfies every preference.
-
-#### `tool_expectations`
-
-Describes expected MCP behavior.
-
-Example:
-```json
-{
-  "required": ["SearchRoutes"],
-  "preferred": ["GetTicks"],
-  "optional": [],
-  "forbidden": []
-}
-```
-
-
-The categories have the following meanings:
-
-required — the task normally cannot be completed correctly without this tool.
-preferred — using this tool is the expected/high-quality strategy, but another valid strategy may exist.
-optional — useful but not necessary.
-forbidden — using this tool would indicate inappropriate behavior.
-
-Avoid requiring an exact tool-call sequence unless there is a strong reason to do so.
-
-The goal is to evaluate appropriate tool use, not whether the agent happened to reproduce one particular implementation.
-
-#### `parameter_assertions`
-
-Use these when the correctness of tool parameters is itself important.
-
-Example:
-
-```json
-{
-  "parameter_assertions": [
-    {
-      "tool": "SearchRoutes",
-      "assert": {
-        "style": "sport",
-        "pitches": 1,
-        "max_grade": "5.7"
-      }
-    }
-  ]
-}
-```
-
-Assertions should focus on meaningful semantic requirements rather than incidental implementation details.
-
-#### `expected_behavior`
-
-This describes what a high-quality agent should do.
-
-Use three levels:
-
-must — essential behavior.
-should — desirable behavior.
-must_not — important failure modes.
-
-Example:
-```
-{
-  "must": [
-    "Recognize that the user is new to outdoor climbing",
-    "Prioritize suitability for a first outdoor lead"
-  ],
-  "should": [
-    "Consider protection and route-finding"
-  ],
-  "must_not": [
-    "Assume that any 5.7 is automatically suitable"
-  ]
-}
-```
-
-This is intentionally more semantic than an exact expected answer.
-
-Multiple routes may be valid recommendations, so the golden set should generally evaluate properties of the answer, not require a particular route name.
-
-#### `judge_dimensions`
-
-The dimensions the LLM judge should evaluate.
-
-Examples:
-```
-[
-  "constraint_following",
-  "tool_selection",
-  "recommendation_quality",
-  "explanation"
-]
-```
-
-Useful dimensions include:
-```
-constraint_following
-constraint_prioritization
-tool_selection
-tool_parameter_accuracy
-getticks_usage
-recommendation_quality
-ranking
-clarification
-ambiguity_handling
-multi_step_reasoning
-party_awareness
-scope_awareness
-honesty
-failure_handling
-hallucination_resistance
-```
-
-Not every case needs every dimension.
-
-#### `difficulty`
-
-Suggested values:
-
-easy
-medium
-hard
-
-
-Difficulty should describe the agent task, not the climbing difficulty.
-
-For example, a 5.5 first-lead query can be a hard evaluation case if correctly answering it requires reasoning about protection and first-lead suitability.
-
-tags
-
-Tags provide a flexible way to slice evaluation results.
-
-Examples:
-```json
-[
-  "beginner",
-  "first_lead",
-  "get_ticks",
-  "multi_step"
-]
-```
-
-Prefer multiple reusable tags over creating an increasingly deep category hierarchy.
-
-## Evaluation Philosophy
-### Don't Require a Single Correct Route
-
-Climbing recommendations are often non-deterministic.
-
-If several routes satisfy the user's requirements, all of them can be valid.
-
-The judge should therefore ask:
-
-Did the agent produce a recommendation that satisfies the user's important requirements?
-
-rather than:
-
-Did the agent return the exact route stored in the golden set?
-
-The golden set should specify expected properties and behavior, not necessarily an exact answer.
-
-Hard Constraints Matter More Than Preferences
-
-For example:
-
-"I need a single-pitch route."
-
-should outweigh:
-
-"I'd prefer something popular."
-
-A route that violates the pitch requirement should not beat a slightly less popular route that satisfies it.
-
-### Grade Is Not the Whole Recommendation
-
-The cases deliberately test situations where climbing grade alone is insufficient.
-
-For example, a first trad lead should consider factors such as:
-
-Protection
-Gear-placement opportunities
-Route-finding
-Exposure
-Pitch count
-Approach
-Descent
-Overall commitment
-
-The exact dimensions depend on what metadata the MCP exposes.
-
-User Experience and Area Familiarity Are Independent
-
-An important distinction throughout the set is:
-
-new to climbing != new to the area
-
-
-For example:
-
-"I'm new to the area but climb 5.11+."
-
-means the agent should recommend hard climbing while accounting for the user's lack of local knowledge.
-
-Similarly:
-
-"I've climbed all the obvious classics."
-
-means the agent should avoid repeatedly returning the area's standard recommendations.
-
-### Clarification Is Sometimes the Correct Answer
-
-Not every query should result in a tool call.
-
-For example:
-
-"Where should I climb tomorrow?"
-
-does not contain enough information to produce a useful recommendation.
-
-The agent should ask for relevant information rather than making arbitrary assumptions.
-
-These cases are important because otherwise an agent can appear highly capable simply by confidently searching and returning something for every query.
-
-## GetTicks
-
-GetTicks should be treated primarily as a ranking/popularity signal, rather than as a generic mandatory step for every route search.
-
-Good use cases include:
-
-"I want to avoid crowds."
-"What are the most climbed routes?"
-"Show me lesser-climbed areas."
-"Give me classics that aren't the usual crowded recommendations."
-
-It should generally not be required simply because a route search is being performed.
-
-When GetTicks is used in a case, the golden set should specify why it is relevant.
-
-For example:
-
-SearchRoutes → find eligible routes
-GetTicks → estimate popularity
-Rank → balance quality and popularity
-
-
-This makes the tool's role explicit and gives the judge something meaningful to evaluate.
-
-## Failure Cases
-
-The golden set should contain cases where the correct behavior is not a successful recommendation.
-
-Important failure modes include:
-
-### No Results
-
-The agent should say that no exact match was found and, where useful, offer alternatives by relaxing constraints.
-
-It should not invent a matching route.
-
-### Tool Failure
-
-If an MCP tool fails or times out, the agent should not fabricate tool results.
-
-Depending on the available tools, it may:
-
-Retry
-Use another appropriate tool
-Explain the limitation
-
-### Missing Metadata
-
-If the MCP does not return information necessary to verify a constraint, the agent should distinguish:
-
-"The route has a short approach."
-
-from:
-
-"I don't have enough data to verify the approach length."
-
-### Unsupported Requests
-
-If the MCP only provides route information, it should not pretend that route metadata answers unrelated questions such as equipment recommendations.
-
-## Recommended Test Coverage
-
-The set should be maintained as a coverage matrix, rather than simply growing organically.
-
-Important dimensions include:
-
-Dimension	Example values
-Experience	beginner / intermediate / advanced
-Area familiarity	newcomer / familiar / local
-Style	sport / trad / top rope
-Grade	5.5–5.6 / 5.7–5.9 / 5.10 / 5.11+
-Pitch	single / multi
-Approach	short / moderate / long
-Popularity	irrelevant / avoid crowds / most popular
-Objective	first lead / project / classic / adventure
-Party	individual / partner / group / mixed ability
-Query specificity	vague / moderate / precise
-Constraints	compatible / conflicting / impossible
-Tool usage	single tool / multi-tool / GetTicks
-Result state	results / no results / partial data / tool failure
-
-New cases should be added deliberately to cover gaps in this matrix.
-
-For example, useful combinations include:
-
-Beginner × trad × first lead
-Beginner × group × top rope
-Advanced × newcomer × hard classics
-Intermediate × local × obscure × GetTicks
-Intermediate × multi-pitch × half-day
-Mixed ability × group
-Conflicting constraints × no results
-
-## Adding a New Case
-
-When adding a case:
-
-Give it a unique, descriptive ID.
-Write the user_query as realistic natural language.
-Record inferred information in context.
-Separate hard_constraints from soft_constraints.
-Specify expected tool behavior.
-Describe semantic expected behavior rather than one exact answer.
-Identify the relevant judge dimensions.
-Add reusable tags.
-Check whether the case fills a coverage gap.
-Prefer cases that expose a specific failure mode over redundant variations of existing cases.
-What Makes a Strong Golden Case?
-
-A strong case has a clear evaluation question.
-
-For example:
-
-Does the agent use popularity data when the user explicitly wants to avoid crowds?
-
-is better than:
-
-Find a good climbing route.
-
-Likewise:
-
-Does the agent recognize that "new to the area" does not mean "beginner"?
-
-is a strong targeted test.
-
-The goal is for every case to tell us something specific about whether the MCP agent is behaving correctly.
-
-## Future Additions
-
-The next cases worth adding are likely to be:
-
-Weather/access-dependent recommendations
-Routes requiring interpretation of multiple pieces of route metadata
-Multi-tool planning tasks
-Cases where two constraints must be traded off
-Cases where the user changes one constraint in a follow-up turn
-Follow-ups referring to a previous recommendation ("What about something harder?")
-Cases where the user explicitly rejects the agent's first recommendation
-Duplicate or near-duplicate route results
-Contradictory metadata returned by tools
-Tool calls with incorrect parameters
-Cases where the agent should stop searching after finding sufficient results
-Cases where additional tool calls materially improve ranking
-Cases where additional tool calls add no value
-
-The most valuable evolution of the set will be from "does the agent find a good route?" toward "does the agent correctly reason about intent, tools, constraints, uncertainty, and tradeoffs?".
+Settings come from the environment via `pydantic-settings`, reading the repo `.env`
+with real environment variables taking precedence:
+
+| Variable | Default | |
+| --- | --- | --- |
+| `OPENBETA_ENDPOINT` | `http://localhost:4000/` | Local, unlike the server's own default. The expectations are pinned to the seeded snapshot, so falling back to live would regenerate against different data and break every later `--check`. |
+| `OPENBETA_MAX_CRAGS` | unset | Recorded in the manifest so cost-vs-quality per cap is a join, not a re-run. |
+| `GRAPHQL_DIR` | `~/repos/openbeta/openbeta-graphql` | Read for `openbeta_graphql_sha`. |
+
+The endpoint is passed explicitly to the server subprocess rather than left to its
+own default, so the endpoint the manifest records is the one the calls went to.
+
+## Categories
+
+**`happy_path`** — the tool can answer, and the answer is checkable. Deterministic
+grading.
+
+**`edge`** — the tool answers, but the honest answer is not the obvious one.
+Count-capping, contradictory constraints, no results, scope limits.
+
+**`no_data`** — the query is well formed and the answer is genuinely empty. Grades
+whether the agent reports that or fills the gap.
+
+**`honest_failure`** — the *data* cannot support the question. The correct answer
+says so. These are the highest-signal cases in the set: the real failure mode of a
+trimmed response is not that the model cannot answer, it is that it invents
+something plausible.
+
+**`no_tool_baseline`** — answerable from the model's own knowledge with no server
+at all. Run with tools disabled first, per [judge.md](../../../docs/plans/judge.md)
+ramp step 0. **This is the number the server has to beat.** If the server does not
+beat it, it is not earning its tokens.
+
+## What the data does not contain
+
+Checked against the tool structs in `internal/tools/` and the upstream schema in
+`schema/openbeta.graphql`. Every row here is a question the set asks anyway, as an
+honest-failure case.
+
+| Asked for | Status |
+| --- | --- |
+| Approach length or time | Absent from every response, and not computable — there is no trailhead geometry, only crag lat/lng. |
+| Quality, stars, "classic" | **Not in the upstream schema at all.** No `rating`, `stars` or `quality` field exists on `Climb` or `Area`. |
+| Ticks, popularity, traffic | `Climb.ticks` exists upstream but no query selects it and no tool returns it. There is no `get_ticks`. |
+| Pitch count | `Climb.pitches` is empty on every climb. `find_climbs` infers `multipitch` from `lengthM >= 60` and reports `yes`/`no`/**`unknown`** — so single-pitch is not expressible, only multipitch-or-unknown. |
+| Protection prose | `Climb.content.protection` is not selected. `get_area_details` returns the `safety` enum only. |
+| Bouldering, ice, mixed, snow, DWS | Rejected by `find_climbs` with an explanation: their grade systems are not parsed. |
+| British E-grades | `SystemFor` maps `US`, `FR` and `UIAA` only. UK crags land in `skipped`. |
+
+## Two data hazards the set is built around
+
+### `totalClimbs` undercounts outside the USA
+
+[`docs/findings/totalclimbs/`](../../../docs/findings/totalclimbs/) measured it:
+British Columbia reports 1052 climbs against 8711 actually held, Alberta 51
+against 2310. The rollup arithmetic is faithful; the leaf values it sums are
+missing, and missing reads as zero. Traced to a 2023 import of non-USA areas.
+
+`crags_near` mitigates by preferring `len(climbs)` over `totalClimbs` — which
+fixes leaf crags but not parent areas, whose `climbs` array is always empty.
+Stawamus Chief is exactly that: `totalClimbs: 369`, `climbs: []`, 32 children.
+
+Because `crags_near` sorts by climb count and caps at 20, both the ordering and
+the membership of a crag list are corrupted outside the USA. So:
+
+> **Crag-valued `set` expectations may only be pinned to USA places.** Everywhere
+> else uses route-level `find_climbs` expectations, which read `climbs` directly
+> and never touch `totalClimbs`.
+
+The `Case` model enforces this rather than trusting anyone to remember it.
+Verified against the local snapshot with the existing
+[`crosscheck.py`](../../../docs/findings/totalclimbs/crosscheck.py): 228 of 228
+Yosemite Valley leaves report `totalClimbs == len(climbs)`, zero climbs invisible.
+
+### The local stack is seeded with USA areas only
+
+Squamish, Peak District, Canmore and Skaha all return **zero** crags against
+`scripts/dev-up.sh`. A non-USA case run there would grade the model on an empty
+result, which tests nothing.
+
+This points the same way as the `totalClimbs` finding above, so the set resolves
+both with one rule: **every case is USA-only**, enforced by the `Case` model. There
+is enough USA data to cover every capability worth testing, and staying inside that
+cohort means no case needs to know which endpoint it is running against — which is
+one field and a branch of validation that no longer have to exist.
+
+The one thing lost is grade-system coverage: every USA crag is YDS, so the French
+and UIAA parsers in `internal/grade/` are exercised by unit tests but by no case
+here. Worth stating in the writeup rather than leaving a reader to find it.
+
+## Guards in `groundtruth.py`
+
+Structural checks run before any network call, so a malformed case fails in
+seconds rather than halfway through a sweep:
+
+- Every name in `expected_tools`/`allowed_tools` is a real tool.
+- `expected_tools` is a subset of `allowed_tools`.
+- Every key in `expected.query.args` is a real parameter of that tool. *(The set
+  this file replaced asserted on `style`, `pitches`, `max_grade`, `difficulty`,
+  `approach_max_minutes` and `location` — not one of which exists.)*
+- Every non-null `place` is in the gazetteer **and** in the USA cohort.
+- A `set` or `scalar` carries a query to generate it from; `prose` carries no value.
+- A `happy_path` `set` that generates empty is an error, not a pass: the model
+  would succeed by saying nothing was found, whatever the response shape.
+- `OPENBETA_ENDPOINT` has a scheme — a bare `host:port` otherwise fails deep in the
+  transport with an error naming neither the setting nor the value.
+
+Everything except the last two is declarative, on the `Case`, `Expected` and
+`Query` models. Pydantic reports the offending field and value, so a malformed case
+fails at load rather than as a confusing tool error mid-sweep.
+
+## Adding a case
+
+1. Name the capability first. If you cannot say what one thing it tests, it is not
+   a case yet.
+2. Check the field is in the data. If it is not, the case is `honest_failure` and
+   the expectation inverts.
+3. Write `user_input` as natural language, naming a gazetteer place. Every tool
+   requires `place` or `lnglat`; a question with no location cannot be answered at
+   all, which is only interesting when clarification is the point.
+4. Prefer a computable expectation. Reach for `prose` when correctness genuinely
+   means faithfulness.
+5. Fill `requires_fields` honestly — this is what predicts which variants fail.
+6. Put the fabrications the case exists to catch in `must_not_include`.
+7. Run `python -m judge.groundtruth` and check the generated value looks right.
+
+Prefer a case that exposes a specific failure mode over another variation on one
+already covered.
+
+## Coverage
+
+Axes that are actually measurable, with where they are exercised:
+
+| Axis | Values | Cases |
+| --- | --- | --- |
+| Discipline | sport / trad / tr / excluded | `sport_first_lead_rumney`, `trad_first_lead_gunks`, `toprope_group_index`, `bouldering_excluded_hueco` |
+| Grade | 5.6-5.7 / 5.8-5.10a / 5.10a-5.11a / 5.11+ | first-lead cases, `multipitch_filter_yosemite`, `grade_span_red_river`, `quality_classics_yosemite` |
+| Grade system | YDS only — see the USA-only note | `grade_span_red_river` |
+| Pitch | multipitch / any | `multipitch_filter_yosemite`, `conflicting_easy_multipitch_rumney` |
+| Tool | `find_climbs` / `crags_near` / `get_area_details` / chained | `crags_near_bishop`, `chain_crag_to_area_yosemite` |
+| Geocoding | gazetteer hit / miss / raw lnglat | `unknown_place_llanberis`, `empty_result_open_ocean`, `no_coverage_lnglat` |
+| Result state | results / empty / `skipped>0` / count-capped | `skipped_routes_honesty`, `count_floor_find_climbs`, `count_upper_bound_crags_near` |
+| Absent field | approach / quality / popularity | the `honest_failure` block |
+| Data hazard | parent-area rollup vs empty `climbs` | `parent_area_rollup_yosemite` |
+| Baseline | no tool needed | the `no_tool_baseline` block |
+
+### Count honesty
+
+Worth its own note, because it grades claims the tool descriptions make
+deliberately:
+
+- `crags_near.count` is an **upper bound** — it counts crags before empty ones are
+  dropped, so some hold nothing climbable.
+- `find_climbs.count` is a **floor** — the search stops at 30.
+- `find_climbs.skipped` means routes were dropped because their grade could not be
+  read, so the list is not complete.
+- `get_area_details` on a parent area returns `totalClimbs` next to an **empty**
+  `climbs` array: the count is a rollup over descendants, not routes held here.
+
+A model that repeats any of these as a plain total is failing in a way a pass rate
+will not show.
+
+## Method honesty
+
+Worth stating in the writeup rather than leaving for a reader to find:
+
+- N is small.
+- The thing being measured was built by the person measuring it.
+- The honest-failure cases are a third of the set. That is deliberate — a set
+  built only from what the tool does well reports a flattering number — but it
+  means the headline pass rate is not "how often does it find a good route".

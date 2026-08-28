@@ -10,6 +10,8 @@ dependencies = [
     "mlflow[genai]==3.5.0",
     "pandas>=2.3.3",
     "protobuf<5",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.15.0",
     "tiktoken>=0.13.0",
 ]
 

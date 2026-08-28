@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "harness_version": "0.1.0",
+  "tool_server_sha": "f6a2fec7d77ff5515113c331504543870a24f671",
+  "openbeta_graphql_sha": "ff58178b38d4efb7cb6dc1e723056f20ef2654ee",
+  "snapshot_date": "2026-08-28",
+  "endpoint": "http://127.0.0.1:4000",
+  "max_crags": 20,
+  "generated_at": "2026-08-28T01:15:01.375976+00:00",
+  "fingerprint": {
+    "sport_first_lead_rumney": "64a3ae985fd53bea",
+    "trad_first_lead_gunks": "0f405e47e2b61599",
+    "toprope_group_index": "c525c7574e5a2cc4",
+    "crags_near_bishop": "5cb112a3cbec1043",
+    "multipitch_filter_yosemite": "0d8f76cf45dc6e0d",
+    "grade_span_red_river": "e0d18b8167ab60bc"
+  },
+  "rubric_version": null
+}

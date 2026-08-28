@@ -10,7 +10,7 @@ import (
 // uiaaModifiers is the width of a UIAA number: -, bare, +.
 const uiaaModifiers = 3
 
-// uiaaMaxNumber bounds the scale. 
+// uiaaMaxNumber bounds the scale.
 const uiaaMaxNumber = 12
 
 // uiaaPattern matches the Arabic-numeral forms: 5, 6+, 7-, and the straddling

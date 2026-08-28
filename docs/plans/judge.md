@@ -17,11 +17,15 @@ multi". The server has no `singlePitchOnly` and infers multipitch from length,
 so a case asking for single-pitch routes is asking for something the tool cannot
 express.
 
-**No discipline axis.** `FindClimbsArgs` has no trad/sport/boulder filter and
-`ClimbMatch` returns no discipline field, so a trad-only case cannot be answered
-correctly or graded objectively. Keep two or three cases that ask for it anyway,
-categorised as honest-failure tests: the right behaviour is saying the data does
-not distinguish, not guessing from route names.
+**Discipline axis, for roped rock only.** Superseded as of `a2a3c93`:
+`FindClimbsArgs` now takes `disciplines` and `ClimbMatch` returns one, over
+`sport`, `trad`, `alpine`, `aid` and `tr`. A trad-only or top-rope-only case is
+answerable and gradeable, and the set exercises all three.
+
+What stays out of scope is everything the grade parsers cannot read — bouldering,
+deep water solo, ice, mixed, snow. `find_climbs` rejects those by name with the
+reason, so the honest-failure framing moves rather than disappears: the right
+behaviour is relaying that rejection, not guessing from route names.
 
 **Fixed local data.** The golden set is pinned to the seeded local stack, so
 expected answers cannot rot underneath it. Record which dump in the case file.
