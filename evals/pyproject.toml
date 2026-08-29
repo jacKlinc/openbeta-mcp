@@ -28,10 +28,10 @@ dev = [
 
 [tool.ruff]
 line-length = 120
-# Ruff lints notebooks by default. Exploration is not held to the modules'
-# standard: a path-setting first cell puts imports after statements, and a
-# scratch cell imports more than it ends up using.
-extend-exclude = ["*.ipynb"]
+# Ruff lints notebooks and formats code blocks in Markdown. Neither is held to
+# the modules' standard: exploration puts imports after statements, and the docs
+# align trailing comments in a way the formatter undoes.
+extend-exclude = ["*.ipynb", "docs/*.md"]
 
 [tool.ruff.lint]
 select = [

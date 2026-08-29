@@ -156,12 +156,15 @@ jobs:
         run: uv sync --locked
 
       - name: ruff
+        id: ruff
         working-directory: evals
+        continue-on-error: true
         run: |
           uv run ruff check .
           uv run ruff format --check .
 
       - name: pytest
+        id: pytest
         working-directory: evals
         # No ANTHROPIC_API_KEY: the loop is stub-driven, so a run never calls the
         # API. A key here would let a pull request spend money.
@@ -171,7 +174,7 @@ jobs:
           echo "COVERAGE=$(uv run coverage report --format=total)" >> "$GITHUB_ENV"
 
       - name: summary
-        if: always()
+        if: always() && steps.pytest.conclusion != 'skipped'
         working-directory: evals
         run: |
           {
@@ -193,6 +196,12 @@ jobs:
           header: evals-coverage
           path: evals/coverage-comment.md
           recreate: false
+
+      - name: fail if ruff failed
+        if: steps.ruff.outcome == 'failure'
+        run: |
+          echo "ruff failed; see the ruff step above"
+          exit 1
 
       - uses: actions/upload-artifact@v4
         if: always()
