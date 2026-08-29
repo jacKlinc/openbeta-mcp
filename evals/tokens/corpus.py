@@ -313,6 +313,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.probe:
+        settings = get_settings()
         probed = select(asyncio.run(probe(args.limit if args.limit != Sampling.CRAWL_TARGET else None)))
         ORIGINS_JSON.parent.mkdir(parents=True, exist_ok=True)
         ORIGINS_JSON.write_text(
@@ -321,8 +322,8 @@ def main() -> None:
                     "probe": {
                         "ladder_km": Sampling.DISTANCES_KM,
                         "plateau_rungs": Sampling.PLATEAU_RUNGS,
-                        "endpoint": get_settings().openbeta_endpoint,
-                        "max_crags": get_settings().openbeta_max_crags,
+                        "endpoint": settings.openbeta_endpoint,
+                        "max_crags": settings.openbeta_max_crags,
                     },
                     "origins": probed,
                 },

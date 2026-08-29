@@ -140,11 +140,7 @@ def mcp_session_or_none(use_cache: bool, corpus: dict, tools: list[str], limit: 
     A cache-only re-count should not need a built binary, let alone a network.
     """
     if use_cache:
-        wanted = [
-            args
-            for tool in tools
-            for args in (corpus[tool][:limit] if limit else corpus[tool])
-        ]
+        wanted = [args for tool in tools for args in (corpus[tool][:limit] if limit else corpus[tool])]
         if all((cache / f"{args_sha(a)}.json").exists() for a in wanted):
             logger.info("cache covers all %d calls; not launching the server", len(wanted))
             return _no_session()
