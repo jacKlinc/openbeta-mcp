@@ -125,16 +125,10 @@ jobs:
           go generate ./...
           git diff --exit-code -- internal/openbeta/generated/
 
-  # Python harness tests, with coverage reported to the PR. GitLab pushes a
-  # coverage number to repo metrics from a regex on the job log; GitHub has no
-  # direct equivalent, so the closest thing is a job summary (which appears on
-  # the run page and in the Actions UI) plus a sticky comment on the PR.
-  #
-  # Every test here needs the compiled binary, because the harness speaks MCP
-  # over stdio to the real server rather than mocking the tool layer. It does
-  # not need a database: 8 of 9 tests pass against an unreachable backend, since
-  # a tool error is valid input to the agent loop. The one that reads real data
-  # is skipped unless OPENBETA_SEEDED is set, so CI stays cheap and offline.
+  # Python harness tests and coverage, reported as a job summary and a sticky PR
+  # comment. Needs the compiled binary — the harness speaks MCP over stdio to the
+  # real server — but no database: the one test that reads real data skips unless
+  # OPENBETA_SEEDED is set.
   evals:
     runs-on: ubuntu-latest
     permissions:
@@ -148,8 +142,7 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      # common/client.py launches this binary; without it every test errors in
-      # setup with a FileNotFoundError that says nothing about the cause.
+      # common/client.py launches this; without it every test dies in setup.
       - name: build the server the harness talks to
         run: go build -o openbeta-mcp ./cmd/openbeta-mcp
 
@@ -170,9 +163,8 @@ jobs:
 
       - name: pytest
         working-directory: evals
-        # No ANTHROPIC_API_KEY: the agent loop is driven by a stub model, so a
-        # run never calls the API and never costs anything. A key reaching CI
-        # would mean a pull request could spend money.
+        # No ANTHROPIC_API_KEY: the loop is stub-driven, so a run never calls the
+        # API. A key here would let a pull request spend money.
         run: |
           uv run pytest --cov --cov-report=xml --cov-report=term \
             --junitxml=junit.xml -q | tee pytest.log
@@ -194,8 +186,6 @@ jobs:
             echo '</details>'
           } | tee coverage-comment.md >> "$GITHUB_STEP_SUMMARY"
 
-      # The nearest thing GitHub has to GitLab's coverage metric: one comment,
-      # edited in place on each push rather than a new one every time.
       - name: comment on the pull request
         if: always() && github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2

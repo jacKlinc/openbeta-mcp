@@ -33,41 +33,25 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="",
         extra="ignore",
-        # The repo .env is what scripts/ and the server itself read. Loading it
-        # here means a recorded endpoint is the one actually in use rather than
-        # the default. A real environment variable still wins over the file.
+        # A real environment variable still wins over the file.
         env_file=REPO_ROOT / ".env",
     )
 
-    # Local by default, unlike the server's own default of api.openbeta.io. The
-    # golden set's expectations are pinned to the seeded local snapshot, so
-    # falling back to live would regenerate them against different data and
-    # record a fingerprint that then fails every subsequent --check.
+    # Local, unlike the server's own default: the golden set is pinned to the seeded snapshot.
     openbeta_endpoint: str = "http://localhost:4000/"
-    # Matches MaxCrags in internal/tools/crags_near.go. Set explicitly rather than
-    # left unset, so a run records the cap that was actually in force -- cost
-    # against quality per cap is meant to be a join, and a null does not join.
-    openbeta_max_crags: int = 20
+    openbeta_max_crags: int = 20  # matches MaxCrags in crags_near.go
     graphql_dir: Path = Path.home() / "repos/openbeta/openbeta-graphql"
 
-    # Haiku for the first pass: the sweep is 27 cases x variants x repeats, and
-    # design.md wants two model sizes anyway -- "trimming hurts the small model
-    # more" is a finding, and the cheap axis is the one to iterate on.
-    # Declared so the key can live in .env alongside everything else. The SDK
-    # reads os.environ, not .env, so without this a key in the file is invisible
-    # to the client and the run fails as if there were no credentials at all.
+    # The SDK reads os.environ, not .env, so a key in the file is invisible without this.
     anthropic_api_key: str | None = None
-    # Required when the key is identity-linked: such a key is not bound to one
-    # workspace, so the request has to name which workspace it bills to.
+    # Required for an identity-linked key, which is not bound to one workspace.
     anthropic_workspace_id: str | None = None
 
     model: str = "claude-haiku-4-5"
-    # Anything else is a placeholder. design.md wants the judge to be a different
-    # model from the one under test, so this is not merely a cost setting.
+    # design.md wants the judge to differ from the model under test.
     judge_model: str = "claude-sonnet-5"
     max_tokens: int = 4096
-    # A 2-step chain is the deepest case in the set; 6 leaves room for a recovery
-    # without letting a confused model spin up a bill.
+    # Deepest case is a 2-step chain; 6 allows a recovery without a runaway bill.
     max_turns: int = 6
 
     @field_validator("openbeta_endpoint")

@@ -147,18 +147,14 @@ async def run_case(
     try:
         while turn < settings.max_turns:
             turn += 1
-            # No temperature: the parameter was removed from the Messages API in
-            # SDK 1.x and is rejected. design.md assumed temperature 0 to damp
-            # variance, so that lever is gone -- run-to-run variance has to be
-            # measured across repeats (--runs) and reported instead.
+            # temperature was removed from the Messages API in SDK 1.x, so variance
+            # must be measured across --runs rather than damped.
             response = await client.messages.create(
                 model=settings.model,
                 max_tokens=settings.max_tokens,
                 system=SYSTEM,
                 messages=messages,
-                # No cache_control anywhere, deliberately. design.md: leave caching
-                # on and the token accounting measures cache behaviour rather than
-                # payload size, which is the variable under study.
+                # No cache_control: caching on would measure cache behaviour, not payload size.
                 **({"tools": tools} if tools else {}),
             )
 
@@ -192,8 +188,7 @@ async def run_case(
                         is_error=bool(called.is_error),
                     )
                 )
-                # A tool error is returned to the model, not raised: recovering
-                # from one is behaviour worth grading, not a harness failure.
+                # Returned to the model, not raised: recovery is behaviour worth grading.
                 results.append(
                     {
                         "type": "tool_result",
@@ -240,8 +235,7 @@ async def sweep(cases: list[Case], *, use_tools: bool, runs: int, out: Path) -> 
         )
     client = AsyncAnthropic(
         api_key=settings.anthropic_api_key,
-        # An identity-linked key spans workspaces, so the API rejects a request
-        # that does not say which one it bills to. Harmless on a scoped key.
+        # An identity-linked key must name a workspace; harmless on a scoped key.
         default_headers=(
             {"anthropic-workspace-id": settings.anthropic_workspace_id} if settings.anthropic_workspace_id else {}
         ),
