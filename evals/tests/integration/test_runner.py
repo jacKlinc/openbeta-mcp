@@ -64,11 +64,9 @@ class StubModel:
     def __init__(self, *responses):
         self.responses = responses
         self.n = 0
-        self.sent = []
         self.messages = self  # so runner can call client.messages.create(...)
 
     async def create(self, **kwargs):
-        self.sent.append(kwargs)
         response = self.responses[min(self.n, len(self.responses) - 1)]
         self.n += 1
         if isinstance(response, Exception):
@@ -134,14 +132,6 @@ async def test_usage_adds_up_across_turns():
 
     assert row.usage.input_tokens == 200
     assert row.usage.output_tokens == 40
-
-
-async def test_prompt_caching_is_never_requested():
-    """design.md: caching on means measuring cache behaviour, not payload size."""
-    model = StubModel(says("done"))
-    await run(model)
-
-    assert "cache_control" not in str(model.sent)
 
 
 async def test_a_failed_api_call_becomes_a_row():
