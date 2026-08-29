@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 from pathlib import Path
 
 import mlflow
 import pandas as pd
 
+from common.config import get_settings
 from common.jsonl import read_df
 
 logger = logging.getLogger(__name__)
@@ -20,8 +20,6 @@ EXPERIMENT = "MCP Tool Performance"
 # environment at export time, which is only right because scripts/tokens.sh
 # exports in the same shell as the sweep -- a re-export later would guess. The
 # defaults mirror cmd/openbeta-mcp/main.go.
-PUBLIC_ENDPOINT = "https://api.openbeta.io/graphql"
-DEFAULT_MAX_CRAGS = "20"
 
 # Column -> metric prefix. A file's measurement is decided by the fields its rows
 # carry, not its name, so one code path serves the token sweep and the Go bench.
@@ -70,6 +68,7 @@ def log_distribution(df: pd.DataFrame, column: str, prefix: str) -> None:
 def log_run(run: str, frames: list[pd.DataFrame]) -> None:
     """One MLflow run for one sweep, across however many datasets it produced."""
     combined = pd.concat(frames, ignore_index=True)
+    settings = get_settings()
 
     with mlflow.start_run(run_name=run):
         mlflow.set_tag("source_run_id", run)
@@ -79,8 +78,8 @@ def log_run(run: str, frames: list[pd.DataFrame]) -> None:
                 "tools": combined["tool"].nunique(),
                 "queries": combined["args_sha"].nunique(),
                 "encoding": combined.get("encoding", pd.Series(["-"])).iloc[0],
-                "endpoint": os.environ.get("OPENBETA_ENDPOINT") or PUBLIC_ENDPOINT,
-                "max_crags": os.environ.get("OPENBETA_MAX_CRAGS") or DEFAULT_MAX_CRAGS,
+                "endpoint": settings.openbeta_endpoint,
+                "max_crags": settings.openbeta_max_crags,
             }
         )
 

@@ -19,17 +19,14 @@ import asyncio
 import hashlib
 import json
 import logging
-import subprocess
-import tomllib
 from datetime import UTC, datetime
-from functools import cache
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from common.client import mcp_session, text_of
+from common.config import get_settings, graphql_sha, harness_version, tool_server_sha
 from tokens.corpus import US_PLACES, args_sha, places
 
 logging.basicConfig(level=logging.INFO)
@@ -41,59 +38,6 @@ GOLDEN_SET = DATA / "golden-set.jsonl"
 MANIFEST = DATA / "manifest.json"
 
 SCHEMA_VERSION = 1
-
-
-class Settings(BaseSettings):
-    """Environment the harness reads, declared in one place.
-
-    These were scattered across os.environ lookups with silent defaults, which is
-    how a run ends up recording an endpoint it did not use. Declared here they are
-    typed, defaulted once, and visible in the manifest.
-    """
-
-    model_config = SettingsConfigDict(
-        env_prefix="",
-        extra="ignore",
-        # The repo .env is what scripts/ and the server itself read. Loading it
-        # here means the manifest records the endpoint actually in use rather than
-        # the default, which is the whole point of recording it. A real environment
-        # variable still wins over the file.
-        env_file=Path(__file__).parents[2] / ".env",
-    )
-
-    # Local by default, unlike the server's own default of api.openbeta.io. The
-    # expectations in this set are pinned to the seeded local snapshot, so falling
-    # back to live would regenerate them against different data and record a
-    # fingerprint that then fails every subsequent --check.
-    openbeta_endpoint: str = "http://localhost:4000/"
-    # Matches MaxCrags in internal/tools/crags_near.go. Set explicitly rather than
-    # left unset, so the manifest records the cap that was actually in force --
-    # cost-vs-quality per cap is meant to be a join, and a null does not join.
-    openbeta_max_crags: int = 20
-    graphql_dir: Path = Path.home() / "repos/openbeta/openbeta-graphql"
-
-    @field_validator("openbeta_endpoint")
-    @classmethod
-    def endpoint_has_a_scheme(cls, v: str) -> str:
-        """A bare host:port reaches the GraphQL client as a relative URL.
-
-        It fails deep inside the transport with an error that names neither the
-        setting nor the value, so catch it here where the message can say both.
-        """
-        if not v.startswith(("http://", "https://")):
-            raise ValueError(f"{v!r} needs a scheme, e.g. http://{v}")
-        return v
-
-
-@cache
-def get_settings() -> Settings:
-    """Settings, resolved on first use.
-
-    Deliberately not a module-level instance: a bad OPENBETA_ENDPOINT in .env would
-    then fail at import, taking down offline uses of load_cases that never touch the
-    network. Resolved lazily, the error appears when the endpoint is actually needed.
-    """
-    return Settings()
 
 
 Tool = Literal["crags_near", "find_climbs", "get_area_details"]
@@ -299,47 +243,6 @@ def load_cases(path: Path = GOLDEN_SET) -> list[Case]:
     return cases
 
 
-def git_sha(repo: Path) -> str:
-    """HEAD of a git checkout.
-
-    Raises rather than returning None: an unrecorded sha means the expectations
-    are pinned to nothing, which defeats the only purpose the manifest has.
-    """
-    if not (repo / ".git").exists():
-        raise GroundTruthError(f"no git checkout at {repo}, so provenance cannot be recorded")
-    try:
-        out = subprocess.run(
-            ["git", "-C", str(repo), "rev-parse", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        raise GroundTruthError(f"git rev-parse failed in {repo}: {(exc.stderr or '').strip()}") from exc
-    except OSError as exc:
-        raise GroundTruthError(f"could not run git in {repo}: {exc}") from exc
-
-    sha = out.stdout.strip()
-    if not sha:
-        raise GroundTruthError(f"git rev-parse returned nothing in {repo}")
-    return sha
-
-
-def harness_version() -> str:
-    """Declared version of this harness, from pyproject.toml.
-
-    Read from the file rather than importlib.metadata because evals is a uv
-    virtual project with no build backend, so nothing ever installs it and the
-    metadata does not exist. Complements tool_server_sha rather than duplicating
-    it: the sha pins the exact code, this records the version someone bumped.
-    """
-    pyproject = Path(__file__).parents[1] / "pyproject.toml"
-    try:
-        return tomllib.loads(pyproject.read_text())["project"]["version"]
-    except (OSError, tomllib.TOMLDecodeError, KeyError) as exc:
-        raise GroundTruthError(f"could not read a version from {pyproject}: {exc}") from exc
-
-
 def extract(tool: str, kind: str, payload: dict[str, Any]) -> list[str] | int:
     """The expected value, pulled from a tool response.
 
@@ -374,13 +277,7 @@ async def generate(cases: list[Case]) -> dict[str, str]:
 
     # Passed explicitly rather than left to the subprocess's own default, so the
     # endpoint the manifest records is the endpoint the calls actually went to.
-    settings = get_settings()
-    env = {
-        "OPENBETA_ENDPOINT": settings.openbeta_endpoint,
-        "OPENBETA_MAX_CRAGS": str(settings.openbeta_max_crags),
-    }
-
-    async with mcp_session(env=env) as session:
+    async with mcp_session(env=get_settings().server_env()) as session:
         for case in generable:
             query = case.expected.query
 
@@ -429,8 +326,8 @@ def write(cases: list[Case], prints: dict[str, str]) -> None:
     # what lets the model require them all.
     manifest = Manifest(
         harness_version=harness_version(),
-        tool_server_sha=git_sha(Path(__file__).parents[2]),
-        openbeta_graphql_sha=git_sha(settings.graphql_dir),
+        tool_server_sha=tool_server_sha(),
+        openbeta_graphql_sha=graphql_sha(),
         snapshot_date=datetime.now(UTC).date().isoformat(),
         endpoint=settings.openbeta_endpoint,
         max_crags=settings.openbeta_max_crags,

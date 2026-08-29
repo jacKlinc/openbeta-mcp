@@ -156,17 +156,26 @@ score. It also refuses several things outright — see **Guards** below.
 
 ### Configuration
 
-Settings come from the environment via `pydantic-settings`, reading the repo `.env`
-with real environment variables taking precedence:
+Settings live in [`common/config.py`](../../common/config.py), shared by the cost
+sweep, the MLflow export and the judge runs — they have to agree on which server
+they measured. Read via `pydantic-settings` from the repo `.env`, with real
+environment variables taking precedence:
 
 | Variable | Default | |
 | --- | --- | --- |
 | `OPENBETA_ENDPOINT` | `http://localhost:4000/` | Local, unlike the server's own default. The expectations are pinned to the seeded snapshot, so falling back to live would regenerate against different data and break every later `--check`. |
-| `OPENBETA_MAX_CRAGS` | unset | Recorded in the manifest so cost-vs-quality per cap is a join, not a re-run. |
+| `OPENBETA_MAX_CRAGS` | `20` | Matches `MaxCrags` in `crags_near.go`. Recorded in the manifest so cost-vs-quality per cap is a join, not a re-run — and a null does not join. |
 | `GRAPHQL_DIR` | `~/repos/openbeta/openbeta-graphql` | Read for `openbeta_graphql_sha`. |
 
-The endpoint is passed explicitly to the server subprocess rather than left to its
-own default, so the endpoint the manifest records is the one the calls went to.
+`Settings.server_env()` builds what is handed to the server subprocess, so the
+endpoint recorded is the one the calls actually went to. Callers used to assemble
+that dict themselves, which is how a run ends up reporting an endpoint it never
+called.
+
+Provenance lives there too — `harness_version()`, `tool_server_sha()`,
+`graphql_sha()`. All three raise rather than returning `None`: a run that cannot be
+attributed to a version of the code and data cannot be compared with a later one,
+which is the only reason to record it.
 
 ## Categories
 

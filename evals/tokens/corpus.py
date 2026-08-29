@@ -5,13 +5,13 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
 import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 from common.client import mcp_session, text_of
+from common.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -321,8 +321,8 @@ def main() -> None:
                     "probe": {
                         "ladder_km": Sampling.DISTANCES_KM,
                         "plateau_rungs": Sampling.PLATEAU_RUNGS,
-                        "endpoint": os.environ.get("OPENBETA_ENDPOINT", "public"),
-                        "max_crags": os.environ.get("OPENBETA_MAX_CRAGS", "default"),
+                        "endpoint": get_settings().openbeta_endpoint,
+                        "max_crags": get_settings().openbeta_max_crags,
                     },
                     "origins": probed,
                 },
