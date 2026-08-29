@@ -13,7 +13,10 @@ but nothing proves it.
 
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
+
+import pytest
 
 from common.client import mcp_session
 from common.config import get_settings
@@ -108,8 +111,16 @@ async def test_calls_a_tool_then_answers():
     assert [c.name for c in row.tool_calls] == ["find_climbs"]
 
 
+@pytest.mark.skipif(
+    not os.environ.get("OPENBETA_SEEDED"),
+    reason="needs a seeded graphql stack; set OPENBETA_SEEDED=1 after scripts/dev-up.sh",
+)
 async def test_tool_output_is_kept_verbatim():
-    """The judge grades the answer against this text, so it must be the real thing."""
+    """The judge grades the answer against this text, so it must be the real thing.
+
+    The only test here that reads real climbing data. The rest need the binary
+    but not the database, because a tool error is valid input to the loop.
+    """
     row = await run(StubModel(calls("find_climbs", place="Rumney"), says("done")))
 
     result = row.tool_calls[0].result
