@@ -50,6 +50,26 @@ class Settings(BaseSettings):
     openbeta_max_crags: int = 20
     graphql_dir: Path = Path.home() / "repos/openbeta/openbeta-graphql"
 
+    # Haiku for the first pass: the sweep is 27 cases x variants x repeats, and
+    # design.md wants two model sizes anyway -- "trimming hurts the small model
+    # more" is a finding, and the cheap axis is the one to iterate on.
+    # Declared so the key can live in .env alongside everything else. The SDK
+    # reads os.environ, not .env, so without this a key in the file is invisible
+    # to the client and the run fails as if there were no credentials at all.
+    anthropic_api_key: str | None = None
+    # Required when the key is identity-linked: such a key is not bound to one
+    # workspace, so the request has to name which workspace it bills to.
+    anthropic_workspace_id: str | None = None
+
+    model: str = "claude-haiku-4-5"
+    # Anything else is a placeholder. design.md wants the judge to be a different
+    # model from the one under test, so this is not merely a cost setting.
+    judge_model: str = "claude-sonnet-5"
+    max_tokens: int = 4096
+    # A 2-step chain is the deepest case in the set; 6 leaves room for a recovery
+    # without letting a confused model spin up a bill.
+    max_turns: int = 6
+
     @field_validator("openbeta_endpoint")
     @classmethod
     def endpoint_has_a_scheme(cls, v: str) -> str:

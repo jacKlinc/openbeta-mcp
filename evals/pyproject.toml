@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "anthropic>=1.2.0",
     "matplotlib>=3.9",
     "mcp[cli]>=2.0.0",
     "mlflow[genai]==3.5.0",
@@ -19,6 +20,8 @@ dependencies = [
 dev = [
     "ipykernel>=6.30",
     "jupyterlab>=4.4",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
     "ruff>=0.14",
 ]
 
@@ -40,3 +43,14 @@ select = [
     "SIM", # simplify
     "RUF",
 ]
+
+[tool.pytest.ini_options]
+# The runner tests drive an async loop against the real MCP server; without this
+# every async test is silently skipped rather than failed, which is worse.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+# The packages are run as `python -m common.…` from evals/, so evals/ is normally
+# the working directory and already importable. pytest collects from tests/, so
+# it needs saying explicitly.
+pythonpath = ["."]
