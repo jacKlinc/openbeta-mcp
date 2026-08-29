@@ -57,9 +57,12 @@ func New(client *openbeta.Client, version string) *mcp.Server {
 			"discipline and whether they are multi-pitch. Takes the same 'place' or 'lnglat' " +
 			"origin as crags_near. " +
 			"Grades are never converted between systems. Write minGrade and maxGrade in the " +
-			"system the crags being searched use — YDS in North America, French in France and " +
-			"Spain, UIAA in central Europe — because each crag is " +
-			"filtered in its own. A crag your bounds cannot be written in is skipped and its " +
+			"system the crags being searched use — YDS in North America, French for sport " +
+			"across most of Europe, UIAA mainly for trad and alpine routes, chiefly in " +
+			"central Europe. The two coexist: an alpine route may carry both, such as the " +
+			"Walker Spur at UIAA IV and French 6a. A crag's system is whichever OpenBeta " +
+			"records for it, so check 'gradeSystem' on a result rather than assuming one " +
+			"from the country. A crag your bounds cannot be written in is skipped and its " +
 			"routes counted in 'skipped', so searching near Siurana for '5.10a' returns " +
 			"nothing rather than an error; British crags are never reachable, because OpenBeta " +
 			"records no British grades at all. Each route names its system in 'gradeSystem', " +
