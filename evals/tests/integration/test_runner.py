@@ -16,7 +16,9 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
+import httpx
 import pytest
+from anthropic import InternalServerError
 
 from common.client import mcp_session
 from common.config import get_settings
@@ -136,10 +138,25 @@ async def test_usage_adds_up_across_turns():
 
 async def test_a_failed_api_call_becomes_a_row():
     """One bad case must not end a sweep that costs money to restart."""
-    row = await run(StubModel(RuntimeError("overloaded")))
+    overloaded = InternalServerError(
+        "overloaded", response=httpx.Response(529, request=httpx.Request("POST", "/")), body=None
+    )
+    row = await run(StubModel(overloaded))
 
-    assert row.error == "RuntimeError: overloaded"
+    assert "InternalServerError" in row.error
     assert row.answer == ""
+
+
+async def test_a_harness_bug_is_not_recorded_as_a_failed_case():
+    """A TypeError is our mistake, not the model's; recording it hides it.
+
+    It surfaces wrapped in an ExceptionGroup, because the MCP session runs the
+    loop inside an anyio task group.
+    """
+    with pytest.raises(BaseException) as caught:
+        await run(StubModel(TypeError("unexpected keyword argument")))
+
+    assert "TypeError" in repr(caught.value)
 
 
 async def test_a_model_that_never_stops_is_capped():

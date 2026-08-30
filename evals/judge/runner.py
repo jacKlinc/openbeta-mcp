@@ -16,19 +16,23 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from anthropic import AsyncAnthropic
-from mcp import ClientSession
+from anthropic import AnthropicError, AsyncAnthropic
+from mcp import ClientSession, MCPError
+from mlflow.exceptions import MlflowException
 from pydantic import BaseModel, ConfigDict, Field
 
 from common import jsonl
 from common.client import mcp_session, text_of
 from common.config import get_settings, harness_version, tool_server_sha
+from common.mlflow_export import TRACKING_URI, export
+from judge.export import EXPERIMENT, RUN_KEY, log_run
 from judge.groundtruth import GOLDEN_SET, Case, load_cases
 from tokens.corpus import args_sha
 
@@ -200,7 +204,7 @@ async def run_case(
             messages.append({"role": "user", "content": results})
         else:
             error = f"hit max_turns={settings.max_turns} without finishing"
-    except Exception as exc:
+    except (AnthropicError, MCPError, OSError, json.JSONDecodeError) as exc:
         error = f"{type(exc).__name__}: {exc}"
         logger.warning("%s: %s", case.case_id, error)
 
@@ -307,6 +311,13 @@ def main() -> int:
     rows = asyncio.run(sweep(cases, use_tools=not args.no_tools, runs=args.runs, out=args.out))
     summarise(rows)
     logger.info("wrote %s", args.out)
+
+    # The JSONL is written and is the source of truth; MLflow is a view
+    try:
+        export([args.out], EXPERIMENT, TRACKING_URI, force=False, key=RUN_KEY, log_run=log_run)
+    except (MlflowException, OSError) as exc:
+        logger.warning("mlflow export failed (%s); rows are still on disk", exc)
+
     return 0
 
 

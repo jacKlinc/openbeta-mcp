@@ -9,8 +9,9 @@ import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
+from mcp import MCPError
 from mcp.types import CallToolResult
 
 from common import jsonl
@@ -62,6 +63,38 @@ def row(tool: str, args: dict[str, Any], text: str, err: bool, run: str) -> dict
     }
 
 
+async def payload(
+    session: CallsTools,
+    tool: str,
+    args: dict[str, Any],
+    cache: Path,
+    use_cache: bool,
+    delay: float,
+) -> tuple[str, bool]:
+    """The tool's response text and whether it errored, from cache or upstream.
+
+    A cache hit skips the call and the pacing delay; a miss writes one.
+    """
+    cached = cache / f"{args_sha(args)}.json"
+    if use_cache and cached.exists():
+        blob = json.loads(cached.read_text())
+        return blob["text"], blob["err"]
+
+    # One dead UUID or unresolvable place must not end a sweep of three hundred
+    # calls, so the failure becomes a row. Narrow: a bug here would otherwise be
+    # cached as an empty result and poison the dataset silently.
+    try:
+        result = await session.call_tool(tool, args)
+        text, err = text_of(result), bool(result.is_error)
+    except (MCPError, OSError, json.JSONDecodeError) as exc:
+        logger.warning("%s %s: %s", tool, args_sha(args), exc)
+        text, err = "", True
+
+    cached.write_text(json.dumps({"tool": tool, "args": args, "text": text, "err": err}))
+    await asyncio.sleep(delay)
+    return text, err
+
+
 async def sweep(
     tools: list[str],
     out: Path,
@@ -88,24 +121,7 @@ async def sweep(
         for tool in tools:
             arg_sets = corpus[tool][:limit] if limit else corpus[tool]
             for i, args in enumerate(arg_sets, start=1):
-                sha = args_sha(args)
-                cached = cache / f"{sha}.json"
-
-                if use_cache and cached.exists():
-                    blob = json.loads(cached.read_text())
-                    text, err = blob["text"], blob["err"]
-                else:
-                    # One dead UUID or unresolvable place must not end a sweep
-                    # of three hundred calls, so the failure becomes a row.
-                    try:
-                        result = await session.call_tool(tool, args)
-                        text, err = text_of(result), bool(result.is_error)
-                    except Exception as exc:
-                        logger.warning("%s %s: %s", tool, sha, exc)
-                        text, err = "", True
-                    cached.write_text(json.dumps({"tool": tool, "args": args, "text": text, "err": err}))
-                    await asyncio.sleep(delay)
-
+                text, err = await payload(session, tool, args, cache, use_cache, delay)
                 record = row(tool, args, text, err, run)
                 jsonl.append(out, record)
                 written += 1
@@ -120,6 +136,12 @@ async def sweep(
 
     logger.info("%d rows in %.0fs -> %s", written, time.monotonic() - started, out)
     return written
+
+
+class CallsTools(Protocol):
+    """What payload needs of a session: the real one and _NoSession both fit."""
+
+    async def call_tool(self, tool: str, args: dict) -> CallToolResult: ...
 
 
 class _NoSession:
