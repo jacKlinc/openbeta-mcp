@@ -1,6 +1,6 @@
 """Push judge runs to MLflow: per-case behaviour, not per-call cost.
 
-Separate from common/export.py because a judge row is a different shape — one
+Separate from tokens/export.py because a judge row is a different shape — one
 per case, with token counts nested under usage — so KINDS would find only `ms`
 and silently drop everything that matters. The plumbing both share is in
 common/mlflow_export.py.
@@ -25,7 +25,7 @@ EXPERIMENT = "MCP Judge Runs"
 RUN_KEY = "run_id"
 
 # Column -> metric prefix. response_ms is whole-loop wall time including tool
-# round trips, deliberately not called latency: common/export.py measures
+# round trips, deliberately not called latency: tokens/export.py measures
 # per-call latency, and the two would invite a meaningless comparison.
 KINDS = {
     "tokens": "tokens",
