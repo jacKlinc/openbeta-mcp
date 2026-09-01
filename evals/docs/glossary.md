@@ -5,7 +5,7 @@ This will cover three processes for now:
 2. Agent Run
 3. ML Flow Export
 
-
+TODO: move model descriptions to code
 ## Ground Truth
 `evals/judge/groundtruth.py`
 
@@ -27,3 +27,5 @@ This will cover three processes for now:
 ## Agent Run
 
 `evals/judge/runner.py`
+
+> `use`: tool calls decided by the model after prompting it. Based on prompt, user input and permitted tools.

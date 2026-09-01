@@ -55,6 +55,8 @@ Grades and safety notes in OpenBeta are user-contributed opinions, not facts. Sa
 so when relaying anything safety-critical, and suggest checking a current local \
 guidebook."""
 
+# TODO: pydantic.Field.description for all models
+
 
 class ToolCall(BaseModel):
     """One tool call and what came back.
@@ -91,7 +93,7 @@ class Result(BaseModel):
     run_id: str
     case_id: str
     capability: str
-    category: str
+    category: str  # TODO: enum
 
     model: str
     provider: str = "anthropic"
