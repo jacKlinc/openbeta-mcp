@@ -21,9 +21,10 @@ import logging
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from anthropic import AnthropicError, AsyncAnthropic
+from anthropic.types import Message, TextBlock, ToolUseBlock
 from mcp import ClientSession, MCPError
 from mlflow.exceptions import MlflowException
 from pydantic import BaseModel, ConfigDict, Field
@@ -129,8 +130,19 @@ async def tool_schemas(session: ClientSession) -> list[dict[str, Any]]:
     return [{"name": t.name, "description": t.description or "", "input_schema": t.input_schema} for t in listed.tools]
 
 
+class Messages(Protocol):
+    async def create(self, **kwargs: Any) -> Message: ...
+
+
+class CreatesMessages(Protocol):
+    """What run_case needs of a client: the real one and the test stub both fit."""
+
+    @property
+    def messages(self) -> Messages: ...
+
+
 async def run_case(
-    client: AsyncAnthropic,
+    client: CreatesMessages,
     session: ClientSession | None,
     case: Case,
     tools: list[dict[str, Any]],
@@ -168,12 +180,12 @@ async def run_case(
             usage.cache_creation_input_tokens += getattr(response.usage, "cache_creation_input_tokens", 0) or 0
             stop_reason = response.stop_reason
 
-            answer = "".join(b.text for b in response.content if b.type == "text") or answer
+            answer = "".join(b.text for b in response.content if isinstance(b, TextBlock)) or answer
 
             if response.stop_reason != "tool_use":
                 break
 
-            uses = [b for b in response.content if b.type == "tool_use"]
+            uses = [b for b in response.content if isinstance(b, ToolUseBlock)]
             messages.append({"role": "assistant", "content": response.content})
 
             results = []
@@ -295,9 +307,9 @@ def summarise(rows: list[Result]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-tools", action="store_true", help="baseline: same questions, no tools bound")
-    parser.add_argument("--cases", nargs="*", help="case_ids to run; default all")
-    parser.add_argument("--runs", type=int, default=1, help="attempts per case")
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument("--cases", nargs="*", help="case_ids to run; default all")  # TODO: remove
+    parser.add_argument("--runs", type=int, default=1, help="attempts per case")  # TODO: remove
+    parser.add_argument("--out", type=Path, default=DEFAULT_OUT)  # TODO: remove
     args = parser.parse_args()
 
     cases = load_cases(GOLDEN_SET)

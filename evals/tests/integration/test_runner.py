@@ -19,6 +19,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from anthropic import InternalServerError
+from anthropic.types import TextBlock, ToolUseBlock
 
 from common.client import mcp_session
 from common.config import get_settings
@@ -29,8 +30,8 @@ CASE_ID = "sport_first_lead_rumney"
 
 
 # --- stub model -------------------------------------------------------------
-# Anthropic responses are plain attribute bags, so SimpleNamespace stands in for
-# them. Each stub below is "what the model replied", nothing more.
+# A response is a SimpleNamespace, but its content blocks are real SDK types:
+# the loop narrows with isinstance, so a look-alike would be silently ignored.
 
 
 def usage():
@@ -47,7 +48,7 @@ def says(text):
     return SimpleNamespace(
         stop_reason="end_turn",
         usage=usage(),
-        content=[SimpleNamespace(type="text", text=text)],
+        content=[TextBlock(type="text", text=text)],
     )
 
 
@@ -56,7 +57,7 @@ def calls(tool, **args):
     return SimpleNamespace(
         stop_reason="tool_use",
         usage=usage(),
-        content=[SimpleNamespace(type="tool_use", id="tu_1", name=tool, input=args)],
+        content=[ToolUseBlock(type="tool_use", id="tu_1", name=tool, input=args)],
     )
 
 
