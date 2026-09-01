@@ -53,4 +53,4 @@ echo "bench: $(wc -l <"$OUT") samples written to $OUT"
 # dataset path is made absolute first, since $OUT is relative to the repo root.
 # Never fatal: the dataset is on disk, and MLflow is a view over it.
 OUT_ABS=$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")
-(cd evals && uv run python -m common.export "$OUT_ABS") || true
+(cd evals && uv run python -m tokens.export "$OUT_ABS") || true

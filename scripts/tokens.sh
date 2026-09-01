@@ -50,4 +50,4 @@ echo "tokens: $(wc -l <"$OUT_TOKENS") rows written to $OUT_TOKENS"
 # dataset paths are made absolute first, since they are relative to the repo root.
 # Never fatal: the datasets are on disk, and MLflow is a view over them.
 ROOT=$(git rev-parse --show-toplevel)
-(cd evals && uv run python -m common.export "$ROOT/$OUT_TOKENS" "$ROOT/$OUT_ROUNDTRIPS") || true
+(cd evals && uv run python -m tokens.export "$ROOT/$OUT_TOKENS" "$ROOT/$OUT_ROUNDTRIPS") || true

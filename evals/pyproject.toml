@@ -5,11 +5,14 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "anthropic>=1.2.0",
     "matplotlib>=3.9",
     "mcp[cli]>=2.0.0",
     "mlflow[genai]==3.5.0",
     "pandas>=2.3.3",
     "protobuf<5",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.15.0",
     "tiktoken>=0.13.0",
 ]
 
@@ -17,15 +20,18 @@ dependencies = [
 dev = [
     "ipykernel>=6.30",
     "jupyterlab>=4.4",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.14",
 ]
 
 [tool.ruff]
 line-length = 120
-# Ruff lints notebooks by default. Exploration is not held to the modules'
-# standard: a path-setting first cell puts imports after statements, and a
-# scratch cell imports more than it ends up using.
-extend-exclude = ["*.ipynb"]
+# Ruff lints notebooks and formats code blocks in Markdown. Neither is held to
+# the modules' standard: exploration puts imports after statements, and the docs
+# align trailing comments in a way the formatter undoes.
+extend-exclude = ["*.ipynb", "docs/*.md"]
 
 [tool.ruff.lint]
 select = [
@@ -37,4 +43,24 @@ select = [
     "B",   # bugbear
     "SIM", # simplify
     "RUF",
+]
+
+[tool.pytest.ini_options]
+# Runner tests drive an async loop; without this every async test is silently skipped
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# tests/integration/ needs the compiled binary and a seeded graphql stack.
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["common", "judge", "tokens"]
+omit = ["*/plots.py", "*/export.py"]  # matplotlib and MLflow views, not logic
+
+[tool.coverage.report]
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
 ]

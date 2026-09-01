@@ -4,7 +4,9 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"math"
 	"slices"
+	"strings"
 
 	"github.com/Khan/genqlient/graphql"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -17,58 +19,71 @@ import (
 // MaxClimbs caps the returned routes. Count reports how many matched.
 const MaxClimbs = 30
 
-// multipitchMinLength is the length, in metres, at or above which a route is
-// treated as multi-pitch.
-//
-// This is inference, not data: Climb.pitches exists in the schema and is empty
-// on every climb — The Apron returns 51 climbs with no pitch data at all,
-// Diedre (6 pitches) among them. Length is the only signal left, and Squamish
-// trad lengths separate cleanly: singles run 15-45m, then the multi-pitch
-// routes appear at 61/91/121/152m, which are 200/300/400/500ft imports. A rope
-// length is the natural boundary between them.
+// Inference, not data: Climb.pitches is empty on every climb upstream.
 const multipitchMinLength = 60
 
-// Pitch classifications. Three values rather than a bool because length is -1
-// on a good fraction of routes — 9 of 59 Squamish trad climbs — and "not
-// recorded" is not the same answer as "single pitch".
+// Three values, not a bool: length is often -1, and unknown != single pitch.
 const (
 	PitchesYes     = "yes"
 	PitchesNo      = "no"
 	PitchesUnknown = "unknown"
 )
 
+// The roped rock disciplines, and all that the disciplines argument accepts.
+const (
+	DisciplineSport   = "sport"
+	DisciplineTrad    = "trad"
+	DisciplineAlpine  = "alpine"
+	DisciplineAid     = "aid"
+	DisciplineTopRope = "tr"
+)
+
+// The rest are excluded because internal/grade parses neither vscale/font nor wi.
+var ropedDisciplines = []string{DisciplineSport, DisciplineTrad, DisciplineAlpine, DisciplineAid, DisciplineTopRope}
+
+// Named so a caller gets a reason rather than an unrecognised-name error.
+var excludedDisciplines = map[string]string{
+	"bouldering":    "boulder problems are graded in V-scale or Font, which the grade filter does not read",
+	"boulder":       "boulder problems are graded in V-scale or Font, which the grade filter does not read",
+	"deepwatersolo": "deep water solos are graded in Font, which the grade filter does not read",
+	"ice":           "ice is graded in WI, a scale that cannot share a range with rock grades",
+	"mixed":         "mixed routes are graded in WI, a scale that cannot share a range with rock grades",
+	"snow":          "snow routes are graded in WI, a scale that cannot share a range with rock grades",
+}
+
 // FindClimbsArgs is the input schema for find_climbs.
-//
-// TODO: trad only for now. Sport, boulder and the rest need the same filter
-// with a discipline argument, and boulders need V-scale rather than YDS.
 type FindClimbsArgs struct {
 	Place          string    `json:"place,omitempty" jsonschema:"A climbing destination or town, for example \"Squamish\". Supply this or lnglat, not both."`
 	LngLat         []float64 `json:"lnglat,omitempty" jsonschema:"An explicit search origin as two numbers in the order [longitude, latitude]. Longitude comes first."`
 	MaxDistanceKm  *float64  `json:"maxDistanceKm,omitempty" jsonschema:"Search radius in kilometres. Defaults to 20, maximum 500."`
-	MinGrade       string    `json:"minGrade,omitempty" jsonschema:"Lowest YDS grade to include, for example \"5.8\". Omit for no lower bound."`
-	MaxGrade       string    `json:"maxGrade,omitempty" jsonschema:"Highest YDS grade to include, for example \"5.10b\". Omit for no upper bound."`
+	Disciplines    []string  `json:"disciplines,omitempty" jsonschema:"Which roped rock disciplines to return: any of \"sport\", \"trad\", \"alpine\", \"aid\", \"tr\" (top rope). Omit for all of them. Routes often carry more than one, so \"sport\" also returns routes that are both sport and top rope."`
+	MinGrade       string    `json:"minGrade,omitempty" jsonschema:"Lowest grade to include, in the grading system of the crags being searched, for example \"5.8\" (YDS), \"6a+\" (French), \"7-\" (UIAA). Omit for no lower bound."`
+	MaxGrade       string    `json:"maxGrade,omitempty" jsonschema:"Highest grade to include, in the same system as minGrade, for example \"5.10b\", \"7a\", \"8+\" or \"23\". Omit for no upper bound."`
 	MultipitchOnly bool      `json:"multipitchOnly,omitempty" jsonschema:"Return only routes that are multi-pitch or whose length is unrecorded. The API stores no pitch count, so this is inferred from route length."`
 }
 
 // ClimbMatch is one route in a find_climbs result.
 type ClimbMatch struct {
-	Name       string   `json:"name"`
-	UUID       string   `json:"uuid"`
-	Grade      string   `json:"grade" jsonschema:"The YDS grade exactly as recorded upstream, which may be imprecise, for example \"5.10\" or \"5.11a/b\"."`
-	Multipitch string   `json:"multipitch" jsonschema:"\"yes\", \"no\", or \"unknown\" when the route's length is not recorded. Inferred from length, not from a pitch count."`
-	LengthM    int      `json:"lengthM,omitempty" jsonschema:"Route length in metres. Absent when not recorded."`
-	Crag       string   `json:"crag"`
-	CragUUID   string   `json:"cragUuid"`
-	DistanceKm float64  `json:"distanceKm"`
-	Path       []string `json:"path,omitempty"`
+	Name string `json:"name"`
+	UUID string `json:"uuid"`
+	// Meaningless apart, and one radius really can span two systems.
+	Grade       string   `json:"grade" jsonschema:"The grade exactly as recorded upstream, which may be imprecise, for example \"5.10\" or \"5.11a/b\". Read it in the system named by gradeSystem."`
+	GradeSystem string   `json:"gradeSystem" jsonschema:"Which system the grade is written in: \"yds\", \"french\" or \"uiaa\". Taken from the crag, so one result set may mix systems."`
+	Disciplines []string `json:"disciplines" jsonschema:"The roped disciplines this route is recorded as. Routes commonly carry more than one."`
+	Multipitch  string   `json:"multipitch" jsonschema:"\"yes\", \"no\", or \"unknown\" when the route's length is not recorded. Inferred from length, not from a pitch count."`
+	LengthM     int      `json:"lengthM,omitempty" jsonschema:"Route length in metres. Absent when not recorded."`
+	Crag        string   `json:"crag"`
+	CragUUID    string   `json:"cragUuid"`
+	DistanceKm  float64  `json:"distanceKm"`
+	Path        []string `json:"path,omitempty"`
 }
 
 // FindClimbsResult is the output schema for find_climbs.
 type FindClimbsResult struct {
 	Climbs       []ClimbMatch  `json:"climbs" jsonschema:"Matching routes, nearest crag first. Capped at 30."`
-	Count        int           `json:"count" jsonschema:"How many routes matched. May exceed the climbs array, which is capped at 30."`
-	CragsScanned int           `json:"cragsScanned" jsonschema:"How many crags were searched. Zero matches with a non-zero scan means the area has no routes fitting the filter, rather than nothing being searched."`
-	SkippedNoYDS int           `json:"skippedNoYds,omitempty" jsonschema:"Trad routes excluded because no YDS grade is recorded for them."`
+	Count        int           `json:"count" jsonschema:"How many routes had matched when the search stopped. The search stops at 30, so this is a floor rather than a total."`
+	CragsScanned int           `json:"cragsScanned" jsonschema:"How many crags were searched. Zero matches with a non-zero scan means the crags searched hold no routes fitting the filter, rather than nothing being searched."`
+	Skipped      int           `json:"skipped,omitempty" jsonschema:"Routes excluded because their grade could not be read: none recorded in the crag's own system, free text, or bounds that cannot be written in that system."`
 	Origin       ResolvedPlace `json:"origin"`
 }
 
@@ -79,77 +94,38 @@ func findClimbs(ctx context.Context, gql graphql.Client, resolver geo.Resolver, 
 		return FindClimbsResult{}, err
 	}
 
-	want, err := gradeRange(args.MinGrade, args.MaxGrade)
+	bounds, err := newGradeBounds(args.MinGrade, args.MaxGrade)
 	if err != nil {
 		return FindClimbsResult{}, err
 	}
 
-	areas, err := nearestCrags(ctx, gql, geo.Point{Lat: origin.Lat, Lng: origin.Lng}, args.MaxDistanceKm)
-	if err != nil {
-		return FindClimbsResult{}, err
-	}
-
-	details, err := fetchAreaDetails(ctx, gql, areas)
+	wanted, err := wantedDisciplines(args.Disciplines)
 	if err != nil {
 		return FindClimbsResult{}, err
 	}
 
 	point := geo.Point{Lat: origin.Lat, Lng: origin.Lng}
-	out := make([]ClimbMatch, 0, MaxClimbs)
-	skipped := 0
-	scanned := 0
-	for i, a := range areas {
-		if details[i] == nil {
-			continue
-		}
-		scanned++
-		for _, c := range details[i].Climbs {
-			// TODO: trad only. A discipline argument would replace this.
-			if !c.Type.Trad {
-				continue
-			}
-			if c.Grades.Yds == "" {
-				skipped++
-				continue
-			}
-			got, err := grade.ParseYDS(c.Grades.Yds)
-			if err != nil {
-				// A grade in some other system, or free text. Not a failure of
-				// the search — count it with the ungraded and move on.
-				skipped++
-				continue
-			}
-			if !got.Overlaps(want) {
-				continue
-			}
-			pitches := multipitch(c.Length)
-			if args.MultipitchOnly && pitches == PitchesNo {
-				continue
-			}
-			m := ClimbMatch{
-				Name:       c.Name,
-				UUID:       c.Uuid,
-				Grade:      c.Grades.Yds,
-				Multipitch: pitches,
-				Crag:       a.AreaName,
-				CragUUID:   a.Uuid,
-				DistanceKm: distanceKm(point, a),
-				Path:       a.PathTokens,
-			}
-			if c.Length > 0 {
-				m.LengthM = c.Length
-			}
-			out = append(out, m)
-		}
+	areas, _, err := nearestCrags(ctx, gql, point, args.MaxDistanceKm)
+	if err != nil {
+		return FindClimbsResult{}, err
 	}
 
-	// Nearest crag first, then easiest route, so a reader working down the list
-	// moves outward rather than jumping between crags.
+	found, err := scanCrags(ctx, gql, point, areas, bounds, wanted, args.MultipitchOnly)
+	if err != nil {
+		return FindClimbsResult{}, err
+	}
+
+	out := found.climbs
+	// Nearest crag first, then easiest route, so the list reads outward.
 	slices.SortStableFunc(out, func(a, b ClimbMatch) int {
 		if d := cmp.Compare(a.DistanceKm, b.DistanceKm); d != 0 {
 			return d
 		}
-		return cmp.Compare(gradeOrder(a.Grade), gradeOrder(b.Grade))
+		// Ordinals compare only within a system; leave cross-system ties alone.
+		if a.GradeSystem != b.GradeSystem {
+			return 0
+		}
+		return cmp.Compare(gradeOrder(a), gradeOrder(b))
 	})
 
 	count := len(out)
@@ -160,30 +136,152 @@ func findClimbs(ctx context.Context, gql graphql.Client, resolver geo.Resolver, 
 	return FindClimbsResult{
 		Climbs:       out,
 		Count:        count,
-		CragsScanned: scanned,
-		SkippedNoYDS: skipped,
+		CragsScanned: found.scanned,
+		Skipped:      found.skipped,
 		Origin:       origin,
 	}, nil
 }
 
-// nearestCrags runs the proximity search and returns the nearest crags, capped.
-//
-// The cap is the same MaxCrags crags_near uses, so a filtered search costs the
-// API no more than an unfiltered one. It does mean a selective filter can miss
-// a match sitting just outside the twenty nearest crags.
-func nearestCrags(ctx context.Context, gql graphql.Client, origin geo.Point, maxDistanceKm *float64) ([]CragsNearCrag, error) {
+// scanResult accumulates one search across however many crags it reaches.
+type scanResult struct {
+	climbs  []ClimbMatch
+	scanned int
+	skipped int
+}
+
+// Batched rather than fanned out so the early stop actually saves requests.
+func scanCrags(
+	ctx context.Context,
+	gql graphql.Client,
+	origin geo.Point,
+	areas []CragsNearCrag,
+	bounds gradeBounds,
+	wanted []string,
+	multipitchOnly bool,
+) (scanResult, error) {
+	out := scanResult{climbs: make([]ClimbMatch, 0, MaxClimbs)}
+
+	attempted, failed := 0, 0
+	var firstErr error
+
+	for start := 0; start < len(areas) && len(out.climbs) < MaxClimbs; start += detailConcurrency {
+		batch := areas[start:min(start+detailConcurrency, len(areas))]
+
+		details, batchFailed, err := fetchAreaDetails(ctx, gql, batch)
+		attempted += len(batch)
+		failed += batchFailed
+		if firstErr == nil {
+			firstErr = err
+		}
+
+		// The batch is already paid for, so filtering it all tightens Count for free.
+		for i, a := range batch {
+			if details[i] == nil {
+				continue
+			}
+			out.add(origin, a, details[i], bounds, wanted, multipitchOnly)
+		}
+	}
+
+	// Judged across the whole search: five of five is bad luck at that size.
+	if err := allFailed(attempted, failed, firstErr); err != nil {
+		return scanResult{}, err
+	}
+	return out, nil
+}
+
+// add filters one crag's climbs into the result.
+func (s *scanResult) add(
+	origin geo.Point,
+	area CragsNearCrag,
+	detail *generated.GetAreaDetailsArea,
+	bounds gradeBounds,
+	wanted []string,
+	multipitchOnly bool,
+) {
+	s.scanned++
+
+	// gradeContext picks the parser, never the grade text: "7" is both French and UIAA.
+	system, ok := grade.SystemFor(detail.GradeContext)
+	if !ok {
+		// British crags always land here: GradeType has no British field.
+		s.skipped += len(detail.Climbs)
+		return
+	}
+
+	// A YDS bound over a French crag: skipping beats guessing or ignoring the range.
+	want, ok := bounds.spanIn(system)
+	if !ok {
+		s.skipped += len(detail.Climbs)
+		return
+	}
+
+	for _, c := range detail.Climbs {
+		got := disciplinesOf(c.Type)
+		if !sharesAny(got, wanted) {
+			continue
+		}
+
+		recorded := grade.Recorded(system, c.Grades.Yds, c.Grades.French, c.Grades.Uiaa)
+		if recorded == "" {
+			s.skipped++
+			continue
+		}
+		span, err := grade.Parse(system, recorded)
+		if err != nil {
+			// Free text, or filed under the wrong system: count it and move on.
+			s.skipped++
+			continue
+		}
+
+		// Cannot disagree, both spans being built in system; skip if that changes.
+		in, err := span.Overlaps(want)
+		if err != nil {
+			s.skipped++
+			continue
+		}
+		if !in {
+			continue
+		}
+
+		pitches := multipitch(c.Length)
+		if multipitchOnly && pitches == PitchesNo {
+			continue
+		}
+
+		m := ClimbMatch{
+			Name:        c.Name,
+			UUID:        c.Uuid,
+			Grade:       recorded,
+			GradeSystem: string(system),
+			Disciplines: got,
+			Multipitch:  pitches,
+			Crag:        area.AreaName,
+			CragUUID:    area.Uuid,
+			DistanceKm:  distanceKm(origin, area),
+			Path:        area.PathTokens,
+		}
+		if c.Length > 0 {
+			m.LengthM = c.Length
+		}
+		s.climbs = append(s.climbs, m)
+	}
+}
+
+// Returns the capped crags plus the uncapped total, which makes a near-miss visible.
+func nearestCrags(ctx context.Context, gql graphql.Client, origin geo.Point, maxDistanceKm *float64) ([]CragsNearCrag, int, error) {
 	km := float64(defaultMaxDistanceKm)
 	if maxDistanceKm != nil {
 		km = *maxDistanceKm
 	}
 	if km <= 0 || km > maxDistanceLimitKm {
-		return nil, fmt.Errorf("maxDistanceKm must be greater than 0 and at most %d, got %g", maxDistanceLimitKm, km)
+		return nil, 0, fmt.Errorf("maxDistanceKm must be greater than 0 and at most %d, got %g", maxDistanceLimitKm, km)
 	}
 
 	// Upstream takes metres; the tools take kilometres. See crags_near.go.
 	resp, err := generated.CragsNear(ctx, gql, generated.Point{Lat: origin.Lat, Lng: origin.Lng}, int(km*1000))
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var found []CragsNearCrag
@@ -193,50 +291,159 @@ func nearestCrags(ctx context.Context, gql graphql.Client, origin geo.Point, max
 	slices.SortFunc(found, func(a, b CragsNearCrag) int {
 		return cmp.Compare(distanceKm(origin, a), distanceKm(origin, b))
 	})
+
+	total := len(found)
 	if len(found) > MaxCrags {
 		found = found[:MaxCrags]
 	}
-	return found, nil
+	return found, total, nil
 }
 
-// gradeRange turns the requested bounds into one span. An omitted bound is
-// open-ended rather than an error.
-func gradeRange(minGrade, maxGrade string) (grade.Span, error) {
-	span := grade.Span{Lo: 0, Hi: 1 << 30}
-	if minGrade != "" {
-		lo, err := grade.ParseYDS(minGrade)
+// Held unparsed: bounds cannot be resolved until a crag names the system.
+type gradeBounds struct{ min, max string }
+
+// Rejects a non-grade up front; a valid grade the search cannot reach is not an error.
+func newGradeBounds(minGrade, maxGrade string) (gradeBounds, error) {
+	b := gradeBounds{min: strings.TrimSpace(minGrade), max: strings.TrimSpace(maxGrade)}
+
+	shared := grade.Systems()
+	for _, bound := range []struct{ name, value string }{{"minGrade", b.min}, {"maxGrade", b.max}} {
+		if bound.value == "" {
+			continue
+		}
+		in := grade.ParsesIn(bound.value)
+		if len(in) == 0 {
+			return b, fmt.Errorf("%s: %q is not a grade in any system this tool reads. Use one of %s",
+				bound.name, bound.value, grade.Examples())
+		}
+		shared = intersectSystems(shared, in)
+	}
+
+	if b.min == "" || b.max == "" {
+		return b, nil
+	}
+
+	// No crag satisfies bounds from two systems; say so rather than skip them all.
+	if len(shared) == 0 {
+		return b, fmt.Errorf("minGrade %q and maxGrade %q are in different grading systems; write both in the same one", b.min, b.max)
+	}
+	for _, system := range shared {
+		lo, err := grade.Parse(system, b.min)
 		if err != nil {
-			return span, fmt.Errorf("minGrade: %w (YDS only, for example 5.8 or 5.10b)", err)
+			continue
+		}
+		hi, err := grade.Parse(system, b.max)
+		if err != nil {
+			continue
+		}
+		if lo.Lo > hi.Hi {
+			return b, fmt.Errorf("minGrade %q is above maxGrade %q", b.min, b.max)
+		}
+	}
+	return b, nil
+}
+
+// False means unreadable in this crag's system, which is not the same as no match.
+func (b gradeBounds) spanIn(system grade.System) (grade.Span, bool) {
+	span := grade.Span{Lo: 0, Hi: math.MaxInt32, System: system}
+	if b.min != "" {
+		lo, err := grade.Parse(system, b.min)
+		if err != nil {
+			return span, false
 		}
 		span.Lo = lo.Lo
 	}
-	if maxGrade != "" {
-		hi, err := grade.ParseYDS(maxGrade)
+	if b.max != "" {
+		hi, err := grade.Parse(system, b.max)
 		if err != nil {
-			return span, fmt.Errorf("maxGrade: %w (YDS only, for example 5.8 or 5.10b)", err)
+			return span, false
 		}
 		span.Hi = hi.Hi
 	}
-	if span.Lo > span.Hi {
-		return span, fmt.Errorf("minGrade %q is above maxGrade %q", minGrade, maxGrade)
-	}
-	return span, nil
+	return span, true
 }
 
-// gradeOrder sorts by the low end of a grade's span, so an ambiguous "5.10"
-// sits with 5.10a rather than floating.
-//
-// TODO: test sort stability if route ordering ever looks wrong.
-func gradeOrder(s string) int {
-	span, err := grade.ParseYDS(s)
+func intersectSystems(a, b []grade.System) []grade.System {
+	var out []grade.System
+	for _, s := range a {
+		if slices.Contains(b, s) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// Omitted means every roped discipline rather than none.
+func wantedDisciplines(requested []string) ([]string, error) {
+	if len(requested) == 0 {
+		return ropedDisciplines, nil
+	}
+
+	out := make([]string, 0, len(requested))
+	for _, d := range requested {
+		name := strings.ToLower(strings.TrimSpace(d))
+		if slices.Contains(ropedDisciplines, name) {
+			if !slices.Contains(out, name) {
+				out = append(out, name)
+			}
+			continue
+		}
+		if why, excluded := excludedDisciplines[name]; excluded {
+			return nil, fmt.Errorf("disciplines: %q is not returned by this tool — %s. Use crags_near to find the areas instead", d, why)
+		}
+		return nil, fmt.Errorf("disciplines: %q is not a discipline this tool knows. Use any of %s", d, strings.Join(ropedDisciplines, ", "))
+	}
+	return out, nil
+}
+
+// Ordered as ropedDisciplines lists them, so results read consistently.
+func disciplinesOf(t generated.GetAreaDetailsAreaClimbsClimbType) []string {
+	var out []string
+	for _, d := range ropedDisciplines {
+		if isDiscipline(t, d) {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func isDiscipline(t generated.GetAreaDetailsAreaClimbsClimbType, name string) bool {
+	switch name {
+	case DisciplineSport:
+		return t.Sport
+	case DisciplineTrad:
+		return t.Trad
+	case DisciplineAlpine:
+		return t.Alpine
+	case DisciplineAid:
+		return t.Aid
+	case DisciplineTopRope:
+		return t.Tr
+	default:
+		return false
+	}
+}
+
+// Any rather than all: a route is often both sport and top rope.
+func sharesAny(got, wanted []string) bool {
+	for _, g := range got {
+		if slices.Contains(wanted, g) {
+			return true
+		}
+	}
+	return false
+}
+
+// Sorts on the low end, so an ambiguous "5.10" sits with 5.10a rather than floating.
+func gradeOrder(m ClimbMatch) int {
+	span, err := grade.Parse(grade.System(m.GradeSystem), m.Grade)
 	if err != nil {
 		return 0
 	}
 	return span.Lo
 }
 
-// multipitch classifies a route from its recorded length. See
-// multipitchMinLength for why this is inference rather than data.
+// Classified from length; see multipitchMinLength for why that is inference.
 func multipitch(length int) string {
 	switch {
 	case length <= 0:
@@ -248,8 +455,7 @@ func multipitch(length int) string {
 	}
 }
 
-// toCragsNearArgs lets the two tools share resolveOrigin, which is the same
-// question in both: place or coordinates, and did the caller give exactly one.
+// Lets both tools share resolveOrigin, the same question in each.
 func (a FindClimbsArgs) toCragsNearArgs() CragsNearArgs {
 	return CragsNearArgs{Place: a.Place, LngLat: a.LngLat, MaxDistanceKm: a.MaxDistanceKm}
 }

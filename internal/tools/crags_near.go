@@ -15,24 +15,16 @@ import (
 	"github.com/jacKlinc/openbeta-mcp/internal/openbeta/generated"
 )
 
-// MaxCrags caps how many crags a single call returns. A metro-sized search
-// yields far more than a model can usefully read, so only the nearest are kept
-// and Count reports how many were found.
-//
-// A var rather than a const so the eval harness can sweep it and measure what
-// the cap costs; main.go sets it once at startup, before the first call.
+// A var, not a const, so the eval harness can sweep it; set once at startup.
 var MaxCrags = 20
 
-// defaultMaxDistanceKm is a radius that covers a climbing destination and its
-// surroundings without reaching the next one.
+// Covers a destination and its surroundings without reaching the next one.
 const defaultMaxDistanceKm = 20
 
-// maxDistanceLimitKm bounds the radius. Beyond this the fan-out below stops
-// being a reasonable thing to do to a free, volunteer-run API.
+// Beyond this the fan-out is unreasonable to do to a volunteer-run API.
 const maxDistanceLimitKm = 500
 
-// detailConcurrency limits the fan-out. Sequential is slow and unlimited is
-// rude; five is neither.
+// Sequential is slow, unlimited is rude.
 const detailConcurrency = 5
 
 // CragsNearArgs is the input schema for crags_near.
@@ -42,9 +34,7 @@ type CragsNearArgs struct {
 	MaxDistanceKm *float64  `json:"maxDistanceKm,omitempty" jsonschema:"Search radius in kilometres. Defaults to 20, maximum 500."`
 }
 
-// ResolvedPlace records what the search origin ended up being, so a wrong
-// gazetteer entry or a misread coordinate is visible in the result rather than
-// silently shifting the answer.
+// Reports the origin used, so a bad gazetteer hit is visible rather than silent.
 type ResolvedPlace struct {
 	Lat    float64 `json:"lat"`
 	Lng    float64 `json:"lng"`
@@ -65,9 +55,10 @@ type NearbyCrag struct {
 
 // CragsNearResult is the output schema for crags_near.
 type CragsNearResult struct {
-	Crags  []NearbyCrag  `json:"crags" jsonschema:"Crags holding climbs, most climbs first. Capped at 20."`
-	Count  int           `json:"count" jsonschema:"How many crags with climbs were found within the radius. May exceed the crags array, which is capped at 20."`
-	Origin ResolvedPlace `json:"origin"`
+	Crags    []NearbyCrag  `json:"crags" jsonschema:"Crags holding climbs, most climbs first. Capped at 20."`
+	Count    int           `json:"count" jsonschema:"How many crags the radius found, before the cap and before empty ones were dropped. An upper bound, not a count of crags holding climbs."`
+	Returned int           `json:"returned" jsonschema:"How many crags are in the crags array. At most 20."`
+	Origin   ResolvedPlace `json:"origin"`
 }
 
 // core: no MCP types, returns a plain error
@@ -78,9 +69,8 @@ func cragsNear(ctx context.Context, gql graphql.Client, resolver geo.Resolver, a
 	}
 
 	point := geo.Point{Lat: origin.Lat, Lng: origin.Lng}
-	// Nearest first, capped. Ranking by climb count is not possible here —
-	// cragsNear returns no climbs, which is what the fan-out below is for.
-	found, err := nearestCrags(ctx, gql, point, args.MaxDistanceKm)
+	// total is taken before the cap and the climb filter, so it can exceed len(crags).
+	found, total, err := nearestCrags(ctx, gql, point, args.MaxDistanceKm)
 	if err != nil {
 		return CragsNearResult{}, err
 	}
@@ -90,21 +80,18 @@ func cragsNear(ctx context.Context, gql graphql.Client, resolver geo.Resolver, a
 		return CragsNearResult{}, err
 	}
 
-	// Densest first: a model reading top-down should meet the significant crags
-	// first.
+	// Densest first, so a model reading top-down meets the significant crags.
 	slices.SortStableFunc(crags, func(a, b NearbyCrag) int {
 		return cmp.Compare(b.ClimbCount, a.ClimbCount)
 	})
 
-	return CragsNearResult{Crags: crags, Count: len(crags), Origin: origin}, nil
+	return CragsNearResult{Crags: crags, Count: total, Returned: len(crags), Origin: origin}, nil
 }
 
-// CragsNearCrag is the generated area type cragsNear returns. Aliased because
-// the generated name is bound to the operation and unwieldy at every use.
+// Aliased: the generated name is bound to the operation and unwieldy at each use.
 type CragsNearCrag = generated.CragsNearCragsNearCragsArea
 
-// resolveOrigin turns the arguments into a search origin, rejecting anything
-// ambiguous before a request is made (FR-18).
+// Rejects ambiguous arguments before any request is made (FR-18).
 func resolveOrigin(ctx context.Context, resolver geo.Resolver, args CragsNearArgs) (ResolvedPlace, error) {
 	hasPlace, hasLngLat := args.Place != "", len(args.LngLat) > 0
 	switch {
@@ -117,9 +104,7 @@ func resolveOrigin(ctx context.Context, resolver geo.Resolver, args CragsNearArg
 			return ResolvedPlace{}, fmt.Errorf("lnglat must have exactly 2 elements [longitude, latitude], got %d", len(args.LngLat))
 		}
 		lng, lat := args.LngLat[0], args.LngLat[1]
-		// geo owns the range check; the ordering hint belongs here, because the
-		// order only exists in this tool's array argument and a transposed pair
-		// is the mistake it invites.
+		// geo owns the range check; the order only exists in this array argument.
 		p, err := geo.NewPoint(lat, lng)
 		if err != nil {
 			return ResolvedPlace{}, fmt.Errorf("%w; order is [longitude, latitude]", err)
@@ -134,20 +119,9 @@ func resolveOrigin(ctx context.Context, resolver geo.Resolver, args CragsNearArg
 	}
 }
 
-// fetchAreaDetails asks for each area's detail concurrently, returning a slice
-// positionally matching areas with nil where the call failed.
-//
-// cragsNear returns no climbs at all, so this second round trip is the only way
-// to learn anything about what a crag actually holds — climb counts here, and
-// the climbs themselves for find_climbs.
-//
-// A crag that fails is dropped rather than failing the whole call: upstream
-// returns intermittent 502s, and one of them should degrade a result rather
-// than erase it. If every call fails, that is an outage and the error is
-// returned, because an empty list would read as "nothing here".
-func fetchAreaDetails(ctx context.Context, gql graphql.Client, areas []CragsNearCrag) ([]*generated.GetAreaDetailsArea, error) {
-	// Per-index slots rather than shared variables: every goroutine writes only
-	// its own element, so no locking is needed to collect either result.
+// Positionally matches areas, nil where a call failed: a 502 degrades, not erases.
+func fetchAreaDetails(ctx context.Context, gql graphql.Client, areas []CragsNearCrag) ([]*generated.GetAreaDetailsArea, int, error) {
+	// Per-index slots: each goroutine writes only its own element, so no locking.
 	details := make([]*generated.GetAreaDetailsArea, len(areas))
 	errs := make([]error, len(areas))
 
@@ -165,7 +139,7 @@ func fetchAreaDetails(ctx context.Context, gql graphql.Client, areas []CragsNear
 		})
 	}
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	failed := 0
@@ -178,21 +152,25 @@ func fetchAreaDetails(ctx context.Context, gql graphql.Client, areas []CragsNear
 			}
 		}
 	}
-	if len(areas) > 0 && failed == len(areas) {
-		return nil, fmt.Errorf("no crag details could be fetched: %w", firstErr)
+	return details, failed, firstErr
+}
+
+// An error only when every detail call failed.
+func allFailed(attempted, failed int, firstErr error) error {
+	if attempted > 0 && failed == attempted {
+		return fmt.Errorf("no crag details could be fetched: %w", firstErr)
 	}
-	return details, nil
+	return nil
 }
 
 // withClimbCounts fills in the climb count cragsNear cannot provide.
 func withClimbCounts(ctx context.Context, gql graphql.Client, origin geo.Point, areas []CragsNearCrag) ([]NearbyCrag, error) {
-	details, err := fetchAreaDetails(ctx, gql, areas)
-	if err != nil {
+	details, failed, firstErr := fetchAreaDetails(ctx, gql, areas)
+	if err := allFailed(len(areas), failed, firstErr); err != nil {
 		return nil, err
 	}
 
-	// Non-nil so an empty result marshals as [] rather than null. An empty
-	// radius is a valid answer, not an error (FR-11).
+	// Non-nil so an empty result marshals as [] not null; empty is valid (FR-11).
 	crags := make([]NearbyCrag, 0, len(areas))
 	for i, a := range areas {
 		if details[i] == nil {
@@ -216,15 +194,7 @@ func withClimbCounts(ctx context.Context, gql graphql.Client, origin geo.Point, 
 	return crags, nil
 }
 
-// climbCount reports how many climbs an area holds.
-//
-// Area.totalClimbs is unreliable and cannot be used alone. It reads 0 on most
-// leaf crags that plainly have climbs — Tantalus Wall reports totalClimbs 0 with
-// 8 climbs, Petrifying Wall 0 with 74. It is only populated meaningfully on
-// parent areas, where it aggregates descendants.
-//
-// So: count climbs for leaf areas, and fall back to totalClimbs for parents,
-// whose own climbs array is always empty. See docs/graphql-findings.md §1.
+// totalClimbs reads 0 on most leaves; fall back to it only for parents. See docs/graphql-findings.md §1.
 func climbCount(totalClimbs, climbs int) int {
 	if climbs > 0 {
 		return climbs

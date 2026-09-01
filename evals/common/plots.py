@@ -35,7 +35,7 @@ INK = "#1a1a19"
 MUTED = "#6b6b63"
 
 # What a value column is called on an axis, and whether it wants a log scale.
-# The same column-driven dispatch common/export.py uses for metric prefixes, so
+# The same column-driven dispatch tokens/export.py uses for metric prefixes, so
 # one implementation serves the token sweep and the Go bench alike.
 MEASURES = {
     "tokens": ("tokens per call", True),

@@ -124,3 +124,90 @@ jobs:
         run: |
           go generate ./...
           git diff --exit-code -- internal/openbeta/generated/
+
+  # Python harness tests and coverage, reported as a job summary and a sticky PR
+  # comment. Needs the compiled binary — the harness speaks MCP over stdio to the
+  # real server — but no database: the one test that reads real data skips unless
+  # OPENBETA_SEEDED is set.
+  evals:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write  # to leave the coverage comment
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # common/client.py launches this; without it every test dies in setup.
+      - name: build the server the harness talks to
+        run: go build -o openbeta-mcp ./cmd/openbeta-mcp
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: evals/uv.lock
+
+      - name: install
+        working-directory: evals
+        run: uv sync --locked
+
+      - name: ruff
+        id: ruff
+        working-directory: evals
+        continue-on-error: true
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: pytest
+        id: pytest
+        working-directory: evals
+        # No ANTHROPIC_API_KEY: the loop is stub-driven, so a run never calls the
+        # API. A key here would let a pull request spend money.
+        run: |
+          uv run pytest --cov --cov-report=xml --cov-report=term \
+            --junitxml=junit.xml -q | tee pytest.log
+          echo "COVERAGE=$(uv run coverage report --format=total)" >> "$GITHUB_ENV"
+
+      - name: summary
+        if: always() && steps.pytest.conclusion != 'skipped'
+        working-directory: evals
+        run: |
+          {
+            echo "## Evals coverage: ${COVERAGE:-unknown}%"
+            echo
+            echo '<details><summary>Per-file</summary>'
+            echo
+            echo '```'
+            uv run coverage report || echo "coverage did not run"
+            echo '```'
+            echo
+            echo '</details>'
+          } | tee coverage-comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: comment on the pull request
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: evals-coverage
+          path: evals/coverage-comment.md
+          recreate: false
+
+      - name: fail if ruff failed
+        if: steps.ruff.outcome == 'failure'
+        run: |
+          echo "ruff failed; see the ruff step above"
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evals-coverage
+          path: |
+            evals/coverage.xml
+            evals/junit.xml
+          retention-days: 14
