@@ -16,18 +16,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import hashlib
 import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any, Literal, Self
-
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from common.client import mcp_session, text_of
 from common.config import get_settings, graphql_sha, harness_version, tool_server_sha
-from tokens.corpus import US_PLACES, args_sha, places
+from judge.models import Case, Generated, Manifest, ScalarExpected, SetExpected
+from judge.payload import GroundTruthError, extract, fingerprint
+from tokens.corpus import args_sha
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,192 +34,6 @@ JUDGE_ROOT = Path(__file__).parent
 DATA = JUDGE_ROOT / "data"
 GOLDEN_SET = DATA / "golden-set.jsonl"
 MANIFEST = DATA / "manifest.json"
-
-SCHEMA_VERSION = 1
-
-
-Tool = Literal["crags_near", "find_climbs", "get_area_details"]
-
-# Every field of every tool's input schema, from internal/tools/. A case naming
-# anything else is asserting against a parameter that does not exist, which was
-# the single most common defect in the set this file replaced.
-TOOL_ARGS: dict[str, set[str]] = {
-    "crags_near": {"place", "lnglat", "maxDistanceKm"},
-    "find_climbs": {"place", "lnglat", "maxDistanceKm", "disciplines", "minGrade", "maxGrade", "multipitchOnly"},
-    "get_area_details": {"areaId"},
-}
-
-# The list of records a response carries, per tool. One lookup serves both the
-# expected value and the fingerprint, since they differ only in which key they
-# read off each record.
-ITEMS: dict[str, Any] = {
-    "crags_near": lambda p: p.get("crags", []),
-    "find_climbs": lambda p: p.get("climbs", []),
-    "get_area_details": lambda p: p.get("area", {}).get("climbs", []),
-}
-
-# The scalar each tool reports. crags_near returns `returned` rather than `count`
-# because count is an upper bound that includes crags holding nothing.
-SCALARS: dict[str, Any] = {
-    "crags_near": lambda p: p.get("returned", 0),
-    "find_climbs": lambda p: p.get("count", 0),
-    "get_area_details": lambda p: len(p.get("area", {}).get("climbs", [])),
-}
-
-
-class GroundTruthError(RuntimeError):
-    """A case cannot be generated truthfully. Never downgraded to a warning."""
-
-
-class Query(BaseModel):
-    """The tool call that produces a case's expected value."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    tool: Tool
-    args: dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def args_exist_on_tool(self) -> Self:
-        unknown = set(self.args) - TOOL_ARGS[self.tool]
-        if unknown:
-            raise ValueError(f"{self.tool} has no parameter {sorted(unknown)}")
-        return self
-
-
-class Generated(BaseModel):
-    """The answer a query produced, and the query's identity in the cost runs.
-
-    Present together or not at all: a case is either generated or it is not, and
-    the two fields were nullable only to express the gap between them.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    value: list[str] | int
-    args_sha: str
-
-
-class SetExpected(BaseModel):
-    """A list of route or area names, graded by set F1."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    kind: Literal["set"] = "set"
-    query: Query
-    generated: Generated | None = None
-
-
-class ScalarExpected(BaseModel):
-    """A single number, graded by exact match."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    kind: Literal["scalar"] = "scalar"
-    query: Query
-    generated: Generated | None = None
-
-
-class ProseExpected(BaseModel):
-    """Graded by the judge on groundedness, so it carries no value to compare."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    kind: Literal["prose"] = "prose"
-    why_not_deterministic: str
-
-
-Expected = Annotated[SetExpected | ScalarExpected | ProseExpected, Field(discriminator="kind")]
-
-
-class Case(BaseModel):
-    """One golden-set case.
-
-    Validation that used to be a hand-rolled loop lives in the model, so a
-    malformed case fails at load with the offending field named, rather than as a
-    confusing tool error halfway through a sweep.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    case_id: str
-    capability: str
-    category: Literal["happy_path", "edge", "no_data", "honest_failure", "no_tool_baseline"]
-    user_input: str
-    place: str | None = None
-    grade_range: str | None = None
-    pitch_filter: Literal["multipitch", "any"] = "any"
-    expected: Expected
-    requires_fields: list[str] = Field(default_factory=list)
-    expected_tools: list[Tool] = Field(default_factory=list)
-    allowed_tools: list[Tool] = Field(default_factory=list)
-    must_include: list[str] = Field(default_factory=list)
-    must_not_include: list[str] = Field(default_factory=list)
-    criteria: Annotated[list[str], Field(min_length=1)]
-    tags: list[str] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def expected_tools_are_allowed(self) -> Self:
-        extra = set(self.expected_tools) - set(self.allowed_tools)
-        if extra:
-            raise ValueError(f"expected_tools {sorted(extra)} are not in allowed_tools")
-        return self
-
-    @model_validator(mode="after")
-    def place_is_a_usa_gazetteer_entry(self) -> Self:
-        """The set is USA-only, deliberately.
-
-        Two independent reasons, either sufficient. The seeded local stack holds
-        USA areas only -- Squamish, Peak District, Canmore and Skaha all return
-        zero crags against it -- so a non-USA case would grade the model on an
-        empty result. And Area.totalClimbs undercounts badly outside the USA
-        (docs/findings/totalclimbs/: 88% in British Columbia, 98% in Alberta),
-        which corrupts both the ordering and the membership of any crags_near
-        result, since it sorts by climb count and caps at 20.
-
-        There is enough USA data to cover every capability worth testing, so the
-        set stays inside the cohort where the numbers are sound. Verified: 228 of
-        228 Yosemite Valley leaves report totalClimbs == len(climbs).
-        """
-        if self.place is None:
-            return self
-        if self.place not in set(places()):
-            raise ValueError(f"place {self.place!r} is not in the gazetteer")
-        if self.place not in US_PLACES:
-            raise ValueError(
-                f"place {self.place!r} is outside the USA. The local stack holds no data for it and "
-                "totalClimbs is unreliable there; see docs/findings/totalclimbs/"
-            )
-        return self
-
-
-class Manifest(BaseModel):
-    """What the expectations are pinned to.
-
-    Written by this module; read by anything that wants to know whether a score is
-    comparable with an earlier one.
-
-    No `model` field, deliberately: the model under test belongs in the result row
-    keyed on (run_id, case_id), alongside judge_model -- see docs/plans/judge.md.
-    design.md runs the same cases across two model sizes and pairs the comparison,
-    so a model pinned here would fork the set and cost the paired tests their power.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    schema_version: int = SCHEMA_VERSION
-    harness_version: str
-    tool_server_sha: str
-    openbeta_graphql_sha: str
-    snapshot_date: str
-    endpoint: str
-    max_crags: int
-    generated_at: str
-    fingerprint: Annotated[dict[str, str], Field(min_length=1)]
-
-    # TODO: required once a rubric exists. Nullable only because there is none to
-    # version yet, not because a run may legitimately lack one.
-    rubric_version: str | None = None
 
 
 def load_cases(path: Path = GOLDEN_SET) -> list[Case]:
@@ -241,32 +53,6 @@ def load_cases(path: Path = GOLDEN_SET) -> list[Case]:
         dupes = sorted({i for i in ids if ids.count(i) > 1})
         raise GroundTruthError(f"{path}: duplicate case_id {dupes}")
     return cases
-
-
-def extract(tool: str, kind: str, payload: dict[str, Any]) -> list[str] | int:
-    """The expected value, pulled from a tool response.
-
-    Names rather than uuids for sets: design.md grades these with normalised string
-    matching, and a uuid tells a reader nothing when a case is reviewed by hand.
-    """
-    if kind == "set":
-        return sorted({item["name"] for item in ITEMS[tool](payload)})
-    if kind == "scalar":
-        return SCALARS[tool](payload)
-    raise GroundTruthError(f"no extraction rule for kind={kind!r}")
-
-
-def fingerprint(tool: str, payload: dict[str, Any]) -> str | None:
-    """sha256 over the uuids a query returned, for drift detection.
-
-    Over uuids, never over climbCount: docs/findings/totalclimbs/ measured that
-    field as unreliable, so hashing it would report drift that is not real and
-    stay quiet on drift that is.
-    """
-    uuids = sorted(item["uuid"] for item in ITEMS[tool](payload))
-    if not uuids:
-        return None
-    return hashlib.sha256("".join(uuids).encode()).hexdigest()[:16]
 
 
 async def generate(cases: list[Case]) -> dict[str, str]:

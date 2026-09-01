@@ -32,9 +32,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from common import jsonl
 from common.client import mcp_session, text_of
 from common.config import get_settings, harness_version, tool_server_sha
-from common.mlflow_export import TRACKING_URI, export
+from common.mlflow_export import export
 from judge.export import EXPERIMENT, RUN_KEY, log_run
-from judge.groundtruth import GOLDEN_SET, Case, load_cases
+from judge.groundtruth import GOLDEN_SET, load_cases
+from judge.models import Case
 from tokens.corpus import args_sha
 
 logging.basicConfig(level=logging.INFO)
@@ -309,26 +310,17 @@ def summarise(rows: list[Result]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-tools", action="store_true", help="baseline: same questions, no tools bound")
-    parser.add_argument("--cases", nargs="*", help="case_ids to run; default all")  # TODO: remove
-    parser.add_argument("--runs", type=int, default=1, help="attempts per case")  # TODO: remove
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT)  # TODO: remove
+    parser.add_argument("--runs", type=int, default=1, help="attempts per case, to measure variance")
     args = parser.parse_args()
 
     cases = load_cases(GOLDEN_SET)
-    if args.cases:
-        wanted = set(args.cases)
-        missing = wanted - {c.case_id for c in cases}
-        if missing:
-            parser.error(f"unknown case_ids: {sorted(missing)}")
-        cases = [c for c in cases if c.case_id in wanted]
-
-    rows = asyncio.run(sweep(cases, use_tools=not args.no_tools, runs=args.runs, out=args.out))
+    rows = asyncio.run(sweep(cases, use_tools=not args.no_tools, runs=args.runs, out=DEFAULT_OUT))
     summarise(rows)
-    logger.info("wrote %s", args.out)
+    logger.info("wrote %s", DEFAULT_OUT)
 
     # The JSONL is written and is the source of truth; MLflow is a view
     try:
-        export([args.out], EXPERIMENT, TRACKING_URI, force=False, key=RUN_KEY, log_run=log_run)
+        export([DEFAULT_OUT], EXPERIMENT, force=False, key=RUN_KEY, log_run=log_run)
     except (MlflowException, OSError) as exc:
         logger.warning("mlflow export failed (%s); rows are still on disk", exc)
 

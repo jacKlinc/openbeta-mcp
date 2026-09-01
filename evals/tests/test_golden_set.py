@@ -10,7 +10,9 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from judge.groundtruth import TOOL_ARGS, Case, Manifest, extract, fingerprint, load_cases
+from judge.groundtruth import load_cases
+from judge.models import TOOL_ARGS, Case, Manifest
+from judge.payload import extract, fingerprint
 
 CASE = {
     "case_id": "t",

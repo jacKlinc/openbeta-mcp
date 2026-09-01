@@ -1,5 +1,8 @@
 # evals
 
+Two halves: [`tokens/`](tokens/) measures what tool responses cost, and
+[`judge/`](judge/README.md) measures whether they help a model answer.
+
 Harness for measuring what the openbeta MCP server costs a model.
 
 Every eval gets a folder. `common/` is the plumbing they share — the stdio

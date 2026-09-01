@@ -23,7 +23,8 @@ from anthropic.types import TextBlock, ToolUseBlock
 
 from common.client import mcp_session
 from common.config import get_settings
-from judge.groundtruth import TOOL_ARGS, load_cases
+from judge.groundtruth import load_cases
+from judge.models import TOOL_ARGS
 from judge.runner import run_case, tool_schemas
 
 CASE_ID = "sport_first_lead_rumney"
