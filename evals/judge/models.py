@@ -188,3 +188,30 @@ class Manifest(BaseModel):
     # TODO: required once a rubric exists. Nullable only because there is none to
     # version yet, not because a run may legitimately lack one.
     rubric_version: str | None = None
+
+
+class Grade(BaseModel):
+    """One graded row, keyed to a Result by (run_id, case_id, attempt)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    case_id: str
+    attempt: int
+    category: Category
+    tools_enabled: bool
+    kind: Literal["set", "scalar", "prose"]
+
+    graded: bool = Field(description="False for a prose case with no phrase checks; the judge scores those.")
+    passed: bool | None = Field(default=None, description="None when not graded.")
+
+    precision: float | None = Field(
+        default=None, description="Named routes that the tools actually returned. The gate: below 1.0 is a fabrication."
+    )
+    recall: float | None = Field(
+        default=None, description="Expected routes the answer named. Diagnostic: summarising is not a failure."
+    )
+    f1: float | None = None
+    scalar_ok: bool | None = None
+    missing_phrases: list[str] = Field(default_factory=list, description="must_include entries absent from the answer.")
+    forbidden_phrases: list[str] = Field(default_factory=list, description="must_not_include entries the answer used.")

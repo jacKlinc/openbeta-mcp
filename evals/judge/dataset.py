@@ -11,6 +11,10 @@ from judge.payload import GroundTruthError
 
 DATA = Path(__file__).parent / "data"
 
+# Run outputs, beside the cost datasets rather than in the package.
+RUNS = Path(__file__).parents[2] / "data" / "judge" / "runs.jsonl"
+GRADES = RUNS.parent / "grades.jsonl"
+
 
 class GoldenSet:
     """The cases and their manifest, read and written together.

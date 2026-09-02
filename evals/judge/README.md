@@ -27,16 +27,28 @@ that alone.
 | `payload.py` | Reading a tool response: what the expected value is, what fingerprints it. |
 | `groundtruth.py` | The generate/check CLI. |
 | `runner.py` | `AgentRunner`: the agent loop. Records what happened; grades nothing. |
-| `export.py` | Result rows to MLflow, over the plumbing in `common/mlflow_export.py`. |
+| `grading.py` | The checks, as pure functions over strings and sets. |
+| `grade.py` | `Grader`: scores rows against the set. |
+| `export.py` | Result rows and grades to MLflow, over `common/mlflow_export.py`. |
 | `data/` | The set itself — see [data/README.md](data/README.md). |
 
 ## Grading
 
-**Not built yet.** `runner.py` captures answers and the exact tool output the model
-saw, because that is what a grader needs; nothing scores them. Per
-[docs/plans/judge.md](../../docs/plans/judge.md) the order is: deterministic
-graders for the 8 computable cases, hand-label the 19 prose ones, then build the
-judge and measure agreement against those labels.
+```
+python -m judge.grade        # score runs.jsonl -> grades.jsonl
+```
+
+Deterministic only. The judge is next, and per
+[docs/plans/judge.md](../../docs/plans/judge.md) the 19 prose cases get hand-labelled
+first: a judge with no measured agreement is unfalsifiable.
+
+`set` cases gate on **precision** — every route named must appear in what the tools
+actually returned that run. Recall and F1 are logged as diagnostics but do not gate:
+a model that lists 19 of 27 routes and hedges is summarising, which is correct for
+the question. Precision below 1.0 means a name that came from somewhere else.
+
+Precision only sees names the case or the tools know about, so a wholly invented
+route is invisible to it; the judge covers that on prose cases.
 
 The three tiers, from [design.md](../docs/design.md), in order of preference:
 

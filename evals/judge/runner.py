@@ -21,7 +21,7 @@ from common import jsonl
 from common.client import mcp_session, text_of
 from common.config import get_settings, harness_version, tool_server_sha
 from common.mlflow_export import export
-from judge.dataset import GoldenSet
+from judge.dataset import RUNS, GoldenSet
 from judge.export import EXPERIMENT, RUN_KEY, log_run
 from judge.models import Case
 from tokens.corpus import args_sha
@@ -29,8 +29,6 @@ from tokens.corpus import args_sha
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-REPO_ROOT = Path(__file__).parents[2]
-DEFAULT_OUT = REPO_ROOT / "data" / "judge" / "runs.jsonl"
 
 ROW_VERSION = 1
 
@@ -382,13 +380,13 @@ def main() -> int:
     args = parser.parse_args()
 
     cases = GoldenSet().cases()
-    rows = asyncio.run(sweep(cases, use_tools=not args.no_tools, runs=args.runs, out=DEFAULT_OUT))
+    rows = asyncio.run(sweep(cases, use_tools=not args.no_tools, runs=args.runs, out=RUNS))
     summarise(rows)
-    logger.info("wrote %s", DEFAULT_OUT)
+    logger.info("wrote %s", RUNS)
 
     # The JSONL is written and is the source of truth; MLflow is a view
     try:
-        export([DEFAULT_OUT], EXPERIMENT, force=False, key=RUN_KEY, log_run=log_run)
+        export([RUNS], EXPERIMENT, force=False, key=RUN_KEY, log_run=log_run)
     except (MlflowException, OSError) as exc:
         logger.warning("mlflow export failed (%s); rows are still on disk", exc)
 

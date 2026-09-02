@@ -7,7 +7,9 @@ import sys
 import mlflow
 import pandas as pd
 
+from common.jsonl import read_df
 from common.mlflow_export import log_series, main
+from judge.dataset import GRADES
 
 EXPERIMENT = "MCP Judge Runs"
 
@@ -57,6 +59,32 @@ def run_params(flat: pd.DataFrame) -> dict[str, object]:
     return {c: flat[c].iloc[0] for c in RUN_PARAMS}
 
 
+def log_grades(run: str, cases: int) -> None:
+    """Quality metrics for one run, if it has been graded.
+
+    Precision gates and recall diagnoses: a trimmed variant that drops routes and
+    one that invents them are different failures, and F1 alone cannot separate them.
+    """
+    if not GRADES.exists():
+        return
+    grades, _ = read_df(GRADES)
+    graded = grades[(grades["run_id"] == run) & grades["graded"]] if not grades.empty else grades
+    if graded.empty:
+        return
+
+    # Logged so nobody reads a p99 off six values.
+    mlflow.log_param("graded_cases", len(graded))
+    mlflow.log_metric("pass_rate", float(graded["passed"].mean()))
+    mlflow.log_metric("ungraded_cases", cases - len(graded))
+
+    for column in ("precision", "recall", "f1"):
+        log_series(graded[column].dropna().tolist(), column)
+
+    # happy_path and honest_failure fail for different reasons; one mean hides that.
+    for category, group in graded.groupby("category"):
+        mlflow.log_metric(f"pass_rate.by_category.{category}", float(group["passed"].mean()))
+
+
 def log_run(run: str, frames: list[pd.DataFrame]) -> None:
     """One MLflow run per sweep, tagged so a tools run and its baseline compare."""
     flat = flatten(pd.concat(frames, ignore_index=True))
@@ -81,6 +109,8 @@ def log_run(run: str, frames: list[pd.DataFrame]) -> None:
         for column, prefix in KINDS.items():
             log_series(ok[column].tolist(), prefix)
             mlflow.log_metric(f"{prefix}.total", float(ok[column].sum()))
+
+        log_grades(run, flat["case_id"].nunique())
 
         mlflow.log_metric("cases.failed", int(flat["failed"].sum()))
         # Tools available and none called: correct for a clarification case,
