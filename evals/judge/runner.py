@@ -1,16 +1,4 @@
-"""Run the golden set against a model talking to the real MCP server.
-
-Records what happened; grades nothing. Scoring is a separate pass, and it needs
-the exact tool output the model had in context -- the judge checks entailment
-against that, not against the world -- so capture is this module's whole job.
-
-A manual loop rather than client.beta.messages.tool_runner: the runner does not
-expose per-call usage, and usage is half of what the study measures.
-
-    python -m judge.runner                     # all cases, tools on
-    python -m judge.runner --no-tools          # the baseline the server must beat
-    python -m judge.runner --cases sport_first_lead_rumney --runs 3
-"""
+"""Run the golden set against a model and record what happened. See judge/README.md."""
 
 from __future__ import annotations
 
@@ -32,9 +20,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from common import jsonl
 from common.client import mcp_session, text_of
 from common.config import get_settings, harness_version, tool_server_sha
-from common.mlflow_export import TRACKING_URI, export
+from common.mlflow_export import export
+from judge.dataset import GoldenSet
 from judge.export import EXPERIMENT, RUN_KEY, log_run
-from judge.groundtruth import GOLDEN_SET, Case, load_cases
+from judge.models import Case
 from tokens.corpus import args_sha
 
 logging.basicConfig(level=logging.INFO)
@@ -151,7 +140,16 @@ async def run_case(
     run: str,
     attempt: int,
 ) -> Result:
-    """One case, one attempt. Returns a row whether it succeeded or failed."""
+    """One case, one attempt.
+
+    Args:
+        session: None when tools are disabled, which is the baseline run.
+        run: the run id shared by every row of this sweep.
+
+    Returns:
+        A row either way: an API or tool failure is recorded in `error` rather
+        than raised, so one bad case cannot end a sweep that costs money.
+    """
     settings = get_settings()
     started = time.monotonic()
     messages: list[dict[str, Any]] = [{"role": "user", "content": case.user_input}]
@@ -245,6 +243,14 @@ async def run_case(
 
 
 async def sweep(cases: list[Case], *, use_tools: bool, runs: int, out: Path) -> list[Result]:
+    """Run every case, appending a row per attempt.
+
+    Args:
+        use_tools: False binds no tools at all, which is the baseline run.
+        runs: attempts per case. Repeats are the only way to measure variance,
+            since temperature was removed from the Messages API.
+        out: JSONL to append to; the source of truth, written before any export.
+    """
     settings = get_settings()
     if not settings.anthropic_api_key:
         raise RuntimeError(
@@ -291,6 +297,7 @@ async def sweep(cases: list[Case], *, use_tools: bool, runs: int, out: Path) -> 
 
 
 def summarise(rows: list[Result]) -> None:
+    """Log the totals, and any case that answered without calling a tool."""
     ok = [r for r in rows if not r.error]
     tokens = sum(r.usage.input_tokens + r.usage.output_tokens for r in rows)
     calls = sum(len(r.tool_calls) for r in rows)
@@ -307,28 +314,20 @@ def summarise(rows: list[Result]) -> None:
 
 
 def main() -> int:
+    """Run the set, write the rows, and push them to MLflow."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-tools", action="store_true", help="baseline: same questions, no tools bound")
-    parser.add_argument("--cases", nargs="*", help="case_ids to run; default all")  # TODO: remove
-    parser.add_argument("--runs", type=int, default=1, help="attempts per case")  # TODO: remove
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT)  # TODO: remove
+    parser.add_argument("--runs", type=int, default=1, help="attempts per case, to measure variance")
     args = parser.parse_args()
 
-    cases = load_cases(GOLDEN_SET)
-    if args.cases:
-        wanted = set(args.cases)
-        missing = wanted - {c.case_id for c in cases}
-        if missing:
-            parser.error(f"unknown case_ids: {sorted(missing)}")
-        cases = [c for c in cases if c.case_id in wanted]
-
-    rows = asyncio.run(sweep(cases, use_tools=not args.no_tools, runs=args.runs, out=args.out))
+    cases = GoldenSet().cases()
+    rows = asyncio.run(sweep(cases, use_tools=not args.no_tools, runs=args.runs, out=DEFAULT_OUT))
     summarise(rows)
-    logger.info("wrote %s", args.out)
+    logger.info("wrote %s", DEFAULT_OUT)
 
     # The JSONL is written and is the source of truth; MLflow is a view
     try:
-        export([args.out], EXPERIMENT, TRACKING_URI, force=False, key=RUN_KEY, log_run=log_run)
+        export([DEFAULT_OUT], EXPERIMENT, force=False, key=RUN_KEY, log_run=log_run)
     except (MlflowException, OSError) as exc:
         logger.warning("mlflow export failed (%s); rows are still on disk", exc)
 

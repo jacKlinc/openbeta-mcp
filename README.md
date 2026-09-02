@@ -229,23 +229,16 @@ transport later is a change at the composition root rather than a fork of the ha
 
 ## Documentation
 
-- [GraphQL findings](docs/graphql-findings.md) — what the live API actually returns, and where it
-  is surprising
-- [genqlient migration notes](docs/genqclient/migration-notes.md) — open items in the switch from
-  the hand-written client to the generated one
-- [cragsNear notes](docs/cragsNear/README.md) — why the proximity query needs a second call, and
-  the shape that follows
-- [Retry policy](docs/retry.md) — design note on handling upstream 5xx, not yet implemented
-- [Round-trip measurements](data/round-trip/README.md) — what each tool costs upstream, and the
-  methodology behind the numbers
-- [Worked example](docs/examples/squamish.md) — both tools against the live API
-- [Functional requirements](docs/poc/functional-requirements.md) — what the server does
-- [Non-functional requirements](docs/poc/non-functional-requirements.md) — how it should behave
+Start with [GraphQL findings](docs/graphql-findings.md) before touching the query layer.
+`Area.totalClimbs` is not a climb count and filtering on it discards most real crags; `zoom`
+changes which level of the hierarchy you get back. Both are load-bearing and neither is obvious
+from the schema.
 
-[GraphQL findings](docs/graphql-findings.md) is worth reading before touching the query layer.
-`Area.totalClimbs` is not a climb count and filtering on it discards most real crags; `zoom` changes
-which level of the hierarchy you get back. Both are load-bearing and neither is obvious from the
-schema.
+- [Functional requirements](docs/poc/functional-requirements.md) — what the server does
+- [evals/](evals/) — cost and quality measurement, each subsystem with its own README
+
+Findings and design notes live beside the code they describe: [docs/findings/](docs/findings/),
+[docs/cragsNear/](docs/cragsNear/), [data/round-trip/](data/round-trip/).
 
 ## License
 

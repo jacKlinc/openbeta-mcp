@@ -10,7 +10,9 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from judge.groundtruth import TOOL_ARGS, Case, Manifest, extract, fingerprint, load_cases
+from judge.dataset import GoldenSet
+from judge.models import TOOL_ARGS, Case, Manifest
+from judge.payload import extract, fingerprint
 
 CASE = {
     "case_id": "t",
@@ -34,7 +36,7 @@ MANIFEST = {
 
 
 def test_the_committed_set_is_valid():
-    cases = load_cases()
+    cases = GoldenSet().cases()
 
     assert len(cases) == 27
     assert len({c.case_id for c in cases}) == len(cases)
@@ -42,7 +44,7 @@ def test_the_committed_set_is_valid():
 
 def test_every_deterministic_case_has_been_generated():
     """An ungenerated case would grade against None."""
-    for case in load_cases():
+    for case in GoldenSet().cases():
         if case.expected.kind in ("set", "scalar"):
             assert case.expected.generated, case.case_id
             assert case.expected.generated.args_sha, case.case_id
@@ -50,7 +52,7 @@ def test_every_deterministic_case_has_been_generated():
 
 def test_every_query_uses_real_tool_parameters():
     """The defect that made the previous golden set ungradeable."""
-    for case in load_cases():
+    for case in GoldenSet().cases():
         if case.expected.kind == "prose":
             continue
         query = case.expected.query

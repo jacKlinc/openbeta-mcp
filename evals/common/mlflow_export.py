@@ -69,9 +69,9 @@ def frames_by_run(paths: list[Path], key: str) -> Iterator[tuple[str, list[pd.Da
     yield from grouped.items()
 
 
-def export(paths: list[Path], experiment: str, tracking_uri: str, force: bool, key: str, log_run: LogRun) -> int:
+def export(paths: list[Path], experiment: str, force: bool, key: str, log_run: LogRun) -> int:
     """Push every run in the given datasets. Returns how many were exported."""
-    mlflow.set_tracking_uri(tracking_uri)
+    mlflow.set_tracking_uri(TRACKING_URI)
     mlflow.set_experiment(experiment)
 
     exported = 0
@@ -91,8 +91,6 @@ def main(description: str, experiment: str, key: str, log_run: LogRun) -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("paths", type=Path, nargs="+", help="JSONL datasets to export")
-    parser.add_argument("--experiment", default=experiment)
-    parser.add_argument("--tracking-uri", default=TRACKING_URI)
     parser.add_argument("--force", action="store_true", help="export runs already present")
     args = parser.parse_args()
 
@@ -104,7 +102,7 @@ def main(description: str, experiment: str, key: str, log_run: LogRun) -> int:
     # A tracking server that is down or moved costs a view of the data, never the
     # data. Narrow on purpose: a bug here should raise, not read as an outage.
     try:
-        export(paths, args.experiment, args.tracking_uri, args.force, key, log_run)
+        export(paths, experiment, args.force, key, log_run)
     except (MlflowException, OSError) as exc:
         logger.warning("mlflow export failed (%s); datasets are still on disk", exc)
 
