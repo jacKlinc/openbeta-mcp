@@ -23,7 +23,7 @@ from anthropic.types import TextBlock, ToolUseBlock
 
 from common.client import mcp_session
 from common.config import get_settings
-from judge.groundtruth import load_cases
+from judge.dataset import GoldenSet
 from judge.models import TOOL_ARGS
 from judge.runner import run_case, tool_schemas
 
@@ -80,7 +80,7 @@ class StubModel:
 
 async def run(model, case_id=CASE_ID, with_tools=True):
     """Run one case against a stub model and the real MCP server."""
-    case = next(c for c in load_cases() if c.case_id == case_id)
+    case = next(c for c in GoldenSet().cases() if c.case_id == case_id)
     async with mcp_session(env=get_settings().server_env()) as session:
         tools = await tool_schemas(session) if with_tools else []
         return await run_case(model, session if with_tools else None, case, tools, "test", 1)

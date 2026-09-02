@@ -1,8 +1,4 @@
-"""Reading a tool response: what the expected value is, and what fingerprints it.
-
-Split from the models because this knows the shape of what each tool returns,
-where the models know only the shape of a case.
-"""
+"""Reading a tool response: the expected value, and what fingerprints it."""
 
 from __future__ import annotations
 

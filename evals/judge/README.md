@@ -5,13 +5,7 @@ separately in [`evals/tokens/`](../tokens/); this is the quality half.
 
 ## The pipeline
 
-```
-golden-set.jsonl ──▶ groundtruth.py ──▶ expected values + manifest fingerprints
-                                              │
-                     runner.py ──▶ model ⇄ MCP tools ──▶ runs.jsonl
-                                              │
-                                       export.py ──▶ MLflow
-```
+![The harness](../docs/diagrams/Harness.drawio.png)
 
 Three commands:
 

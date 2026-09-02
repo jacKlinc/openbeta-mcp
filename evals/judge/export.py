@@ -1,15 +1,4 @@
-"""Push judge runs to MLflow: per-case behaviour, not per-call cost.
-
-Separate from tokens/export.py because a judge row is a different shape — one
-per case, with token counts nested under usage — so KINDS would find only `ms`
-and silently drop everything that matters. The plumbing both share is in
-common/mlflow_export.py.
-
-No pass rate yet, because no grader exists. Report tokens per *successful* case
-once success can be measured; until then a variant that fails fast looks cheap.
-
-    python -m judge.export data/judge/runs.jsonl
-"""
+"""Push judge runs to MLflow: per-case behaviour, not per-call cost."""
 
 from __future__ import annotations
 
@@ -47,30 +36,45 @@ def flatten(df: pd.DataFrame) -> pd.DataFrame:
     return flat
 
 
+# Fields that describe the run rather than a case, so every row must agree. Taking
+# row zero without checking would silently label a mixed run by whichever came first.
+RUN_PARAMS = [
+    "model",
+    "provider",
+    "tools_enabled",
+    "endpoint",
+    "max_crags",
+    "harness_version",
+    "tool_server_sha",
+]
+
+
+def run_params(flat: pd.DataFrame) -> dict[str, object]:
+    """The run-level fields, checked to be constant across its rows."""
+    mixed = {c: sorted(map(str, flat[c].unique())) for c in RUN_PARAMS if flat[c].nunique() > 1}
+    if mixed:
+        raise ValueError(f"rows disagree on run-level fields: {mixed}")
+    return {c: flat[c].iloc[0] for c in RUN_PARAMS}
+
+
 def log_run(run: str, frames: list[pd.DataFrame]) -> None:
     """One MLflow run per sweep, tagged so a tools run and its baseline compare."""
     flat = flatten(pd.concat(frames, ignore_index=True))
     ok = flat[~flat["failed"]]
-    first = flat.iloc[0]
+    params = run_params(flat)
 
     with mlflow.start_run(run_name=run):
         mlflow.set_tag("source_run_id", run)
         # The axis every comparison turns on: same cases, tools on versus off.
-        mlflow.set_tag("tools_enabled", str(bool(first["tools_enabled"])))
-        mlflow.set_tag("model", first["model"])
+        mlflow.set_tag("tools_enabled", str(bool(params["tools_enabled"])))
+        mlflow.set_tag("model", params["model"])
 
         mlflow.log_params(
-            {
-                "model": first["model"],
-                "provider": first["provider"],
-                "tools_enabled": bool(first["tools_enabled"]),
+            params
+            | {
                 "cases": flat["case_id"].nunique(),
                 "attempts": int(flat["attempt"].max()),
                 "rows": len(flat),
-                "endpoint": first["endpoint"],
-                "max_crags": int(first["max_crags"]),
-                "harness_version": first["harness_version"],
-                "tool_server_sha": first["tool_server_sha"],
             }
         )
 

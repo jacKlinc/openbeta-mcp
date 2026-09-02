@@ -1,12 +1,8 @@
-"""The golden set's schema.
-
-These models are the contract every case is written against, so the field
-descriptions are the reference — `Case.model_json_schema()` rather than prose that
-drifts. Nothing here touches the network, so a grader can import it cheaply.
-"""
+"""The golden set's schema. See judge/README.md."""
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -16,6 +12,31 @@ from tokens.corpus import US_PLACES, places
 SCHEMA_VERSION = 1
 
 Tool = Literal["crags_near", "find_climbs", "get_area_details"]
+
+
+class Category(StrEnum):
+    """What kind of answer a case is testing for."""
+
+    HAPPY_PATH = "happy_path"
+    """The tool can answer and the answer is checkable."""
+
+    EDGE = "edge"
+    """The tool answers, but the honest answer is not the obvious one: a capped
+    count, contradictory constraints, a scope limit."""
+
+    NO_DATA = "no_data"
+    """The query is well formed and the answer is genuinely empty. Grades whether
+    the agent reports that or fills the gap."""
+
+    HONEST_FAILURE = "honest_failure"
+    """The data cannot support the question, so the correct answer says so. The
+    real failure mode of a trimmed response is not that the model cannot answer,
+    it is that it invents something plausible."""
+
+    NO_TOOL_BASELINE = "no_tool_baseline"
+    """Answerable from the model's own knowledge. The number the server has to
+    beat: if it does not, it is not earning its tokens."""
+
 
 # Every field of every tool's input schema, from internal/tools/. A case naming
 # anything else asserts against a parameter that does not exist, which was the
@@ -78,13 +99,7 @@ class ProseExpected(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["prose"] = "prose"
-    why_not_deterministic: str = Field(
-        description=(
-            "Why this case cannot be machine-graded. Required so the judge stays a "
-            "last resort rather than the default: most cases have ground truth "
-            "computable straight from the API."
-        )
-    )
+    why_not_deterministic: str = Field(description="Why this cannot be machine-graded. Keeps the judge a last resort.")
 
 
 Expected = Annotated[SetExpected | ScalarExpected | ProseExpected, Field(discriminator="kind")]
@@ -96,26 +111,16 @@ class Case(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     case_id: str
-    capability: str = Field(description="The one thing under test, and the axis results are sliced on.")
-    category: Literal["happy_path", "edge", "no_data", "honest_failure", "no_tool_baseline"]
+    capability: str = Field(description="The one thing under test; the axis results are sliced on.")
+    category: Category
     user_input: str
-    place: str | None = Field(
-        default=None,
-        description=(
-            "Gazetteer place the case targets, or null for the clarification and "
-            "raw-coordinate cases. Must be in the USA cohort; see the validator."
-        ),
-    )
+    place: str | None = Field(default=None, description="Gazetteer place, USA-only. Null for clarification cases.")
     grade_range: str | None = None
     pitch_filter: Literal["multipitch", "any"] = "any"
     expected: Expected
     requires_fields: list[str] = Field(
         default_factory=list,
-        description=(
-            "Response paths the answer depends on, e.g. climbs[].disciplines. "
-            "Records which variants should fail before anything is run, which is "
-            "what makes this a trimming study rather than a pass-rate table."
-        ),
+        description="Response paths the answer depends on, so a variant's failure is predicted not observed.",
     )
     expected_tools: list[Tool] = Field(default_factory=list, description="Tools a correct answer calls.")
     allowed_tools: list[Tool] = Field(
