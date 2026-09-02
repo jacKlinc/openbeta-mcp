@@ -15,9 +15,18 @@ def settings(**over) -> Settings:
     return Settings(_env_file=None, **over)
 
 
-def test_endpoint_must_have_a_scheme():
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        pytest.param("127.0.0.1:4000", id="bare host and port"),
+        pytest.param("localhost:4000/", id="no scheme with a path"),
+        pytest.param("ftp://localhost:4000", id="wrong scheme"),
+    ],
+)
+def test_endpoint_must_have_an_http_scheme(endpoint):
+    """A bare host:port reaches the GraphQL client as a relative URL and fails deep."""
     with pytest.raises(ValidationError, match="needs a scheme"):
-        settings(openbeta_endpoint="127.0.0.1:4000")
+        settings(openbeta_endpoint=endpoint)
 
 
 def test_endpoint_defaults_to_local():
