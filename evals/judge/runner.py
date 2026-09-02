@@ -65,12 +65,25 @@ class ToolCall(BaseModel):
 
 
 class Usage(BaseModel):
+    """Tokens across every model call of one case."""
+
     model_config = ConfigDict(extra="forbid")
 
     input_tokens: int = 0
     output_tokens: int = 0
     cache_read_input_tokens: int = 0
     cache_creation_input_tokens: int = 0
+
+    def add(self, usage: Any) -> None:
+        """Accumulate one response's usage.
+
+        The cache fields are recorded to prove caching stayed off, and are read
+        defensively because the SDK does not guarantee them on every response.
+        """
+        self.input_tokens += usage.input_tokens
+        self.output_tokens += usage.output_tokens
+        self.cache_read_input_tokens += getattr(usage, "cache_read_input_tokens", 0) or 0
+        self.cache_creation_input_tokens += getattr(usage, "cache_creation_input_tokens", 0) or 0
 
 
 class Result(BaseModel):
@@ -132,155 +145,178 @@ class CreatesMessages(Protocol):
     def messages(self) -> Messages: ...
 
 
-async def run_case(
-    client: CreatesMessages,
-    session: ClientSession | None,
-    case: Case,
-    tools: list[dict[str, Any]],
-    run: str,
-    attempt: int,
-) -> Result:
-    """One case, one attempt.
+class AgentRunner:
+    """Drives one sweep: a model, the tools it may call, and the rows produced.
 
     Args:
+        client: anything exposing `messages.create`; the tests pass a stub.
         session: None when tools are disabled, which is the baseline run.
+        tools: schemas offered to the model, empty when session is None.
         run: the run id shared by every row of this sweep.
-
-    Returns:
-        A row either way: an API or tool failure is recorded in `error` rather
-        than raised, so one bad case cannot end a sweep that costs money.
     """
-    settings = get_settings()
-    started = time.monotonic()
-    messages: list[dict[str, Any]] = [{"role": "user", "content": case.user_input}]
-    calls: list[ToolCall] = []
-    usage = Usage()
-    stop_reason: str | None = None
-    error: str | None = None
-    answer = ""
-    turn = 0
 
-    try:
-        while turn < settings.max_turns:
-            turn += 1
-            # temperature was removed from the Messages API in SDK 1.x, so variance
-            # must be measured across --runs rather than damped.
-            response = await client.messages.create(
-                model=settings.model,
-                max_tokens=settings.max_tokens,
-                system=SYSTEM,
-                messages=messages,
-                # No cache_control: caching on would measure cache behaviour, not payload size.
-                **({"tools": tools} if tools else {}),
+    def __init__(
+        self,
+        client: CreatesMessages,
+        session: ClientSession | None,
+        tools: list[dict[str, Any]],
+        run: str,
+    ) -> None:
+        self.client = client
+        self.session = session
+        self.tools = tools
+        self.run = run
+        self.settings = get_settings()
+
+    async def ask(self, messages: list[dict[str, Any]]) -> Message:
+        """One model call."""
+        return await self.client.messages.create(
+            model=self.settings.model,
+            max_tokens=self.settings.max_tokens,
+            system=SYSTEM,
+            messages=messages,
+            # No temperature: removed from the Messages API in SDK 1.x, so variance
+            # is measured across --runs rather than damped.
+            # No cache_control: caching on would measure cache behaviour, not payload size.
+            **({"tools": self.tools} if self.tools else {}),
+        )
+
+    async def execute(self, uses: list[ToolUseBlock], turn: int) -> tuple[list[ToolCall], list[dict[str, Any]]]:
+        """Run the requested tools.
+
+        Returns:
+            The records to keep, and the tool_result blocks to send back. Both come
+            from the same call, which is why they are built together. A tool error
+            is returned to the model rather than raised: recovering from one is
+            behaviour worth grading.
+        """
+        calls: list[ToolCall] = []
+        results: list[dict[str, Any]] = []
+
+        for use in uses:
+            if self.session is None:  # --no-tools bound none, so this cannot happen
+                raise RuntimeError("model requested a tool with tools disabled")
+            called = await self.session.call_tool(use.name, use.input)
+            text = text_of(called)
+            calls.append(
+                ToolCall(
+                    turn=turn,
+                    name=use.name,
+                    args=dict(use.input),
+                    args_sha=args_sha(dict(use.input)),
+                    result=text,
+                    is_error=bool(called.is_error),
+                )
+            )
+            results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": use.id,
+                    "content": text,
+                    "is_error": bool(called.is_error),
+                }
             )
 
-            usage.input_tokens += response.usage.input_tokens
-            usage.output_tokens += response.usage.output_tokens
-            usage.cache_read_input_tokens += getattr(response.usage, "cache_read_input_tokens", 0) or 0
-            usage.cache_creation_input_tokens += getattr(response.usage, "cache_creation_input_tokens", 0) or 0
-            stop_reason = response.stop_reason
+        return calls, results
 
-            answer = "".join(b.text for b in response.content if isinstance(b, TextBlock)) or answer
+    async def run_case(self, case: Case, attempt: int) -> Result:
+        """One case, one attempt.
 
-            if response.stop_reason != "tool_use":
-                break
+        Returns:
+            A row either way: an API or tool failure is recorded in `error` rather
+            than raised, so one bad case cannot end a sweep that costs money.
+        """
+        started = time.monotonic()
+        messages: list[dict[str, Any]] = [{"role": "user", "content": case.user_input}]
+        calls: list[ToolCall] = []
+        usage = Usage()
+        stop_reason: str | None = None
+        error: str | None = None
+        answer = ""
+        turn = 0
 
-            uses = [b for b in response.content if isinstance(b, ToolUseBlock)]
-            messages.append({"role": "assistant", "content": response.content})
+        try:
+            while turn < self.settings.max_turns:
+                turn += 1
+                response = await self.ask(messages)
+                usage.add(response.usage)
+                stop_reason = response.stop_reason
 
-            results = []
-            for use in uses:
-                if session is None:  # --no-tools bound none, so this cannot happen
-                    raise RuntimeError("model requested a tool with tools disabled")
-                called = await session.call_tool(use.name, use.input)
-                text = text_of(called)
-                calls.append(
-                    ToolCall(
-                        turn=turn,
-                        name=use.name,
-                        args=dict(use.input),
-                        args_sha=args_sha(dict(use.input)),
-                        result=text,
-                        is_error=bool(called.is_error),
-                    )
+                # Keep the last non-empty text: a tool_use turn often carries
+                # preamble that would otherwise overwrite the real answer.
+                answer = "".join(b.text for b in response.content if isinstance(b, TextBlock)) or answer
+
+                if response.stop_reason != "tool_use":
+                    break
+
+                messages.append({"role": "assistant", "content": response.content})
+                turn_calls, results = await self.execute(
+                    [b for b in response.content if isinstance(b, ToolUseBlock)], turn
                 )
-                # Returned to the model, not raised: recovery is behaviour worth grading.
-                results.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": use.id,
-                        "content": text,
-                        "is_error": bool(called.is_error),
-                    }
-                )
-            messages.append({"role": "user", "content": results})
-        else:
-            error = f"hit max_turns={settings.max_turns} without finishing"
-    except (AnthropicError, MCPError, OSError, json.JSONDecodeError) as exc:
-        error = f"{type(exc).__name__}: {exc}"
-        logger.warning("%s: %s", case.case_id, error)
+                calls.extend(turn_calls)
+                messages.append({"role": "user", "content": results})
+            else:
+                error = f"hit max_turns={self.settings.max_turns} without finishing"
+        except (AnthropicError, MCPError, OSError, json.JSONDecodeError) as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            logger.warning("%s: %s", case.case_id, error)
 
-    return Result(
-        run_id=run,
-        case_id=case.case_id,
-        capability=case.capability,
-        category=case.category,
-        model=settings.model,
-        tools_enabled=bool(tools),
-        attempt=attempt,
-        harness_version=harness_version(),
-        tool_server_sha=tool_server_sha(),
-        endpoint=settings.openbeta_endpoint,
-        max_crags=settings.openbeta_max_crags,
-        answer=answer,
-        tool_calls=calls,
-        turns=turn,
-        stop_reason=stop_reason,
-        usage=usage,
-        ms=int((time.monotonic() - started) * 1000),
-        error=error,
-    )
-
-
-async def sweep(cases: list[Case], *, use_tools: bool, runs: int, out: Path) -> list[Result]:
-    """Run every case, appending a row per attempt.
-
-    Args:
-        use_tools: False binds no tools at all, which is the baseline run.
-        runs: attempts per case. Repeats are the only way to measure variance,
-            since temperature was removed from the Messages API.
-        out: JSONL to append to; the source of truth, written before any export.
-    """
-    settings = get_settings()
-    if not settings.anthropic_api_key:
-        raise RuntimeError(
-            "no ANTHROPIC_API_KEY in the environment or evals/.env -- every case in this sweep costs money, "
-            "so it fails here rather than partway through"
+        return self._result(
+            case,
+            attempt,
+            answer=answer,
+            calls=calls,
+            turns=turn,
+            stop_reason=stop_reason,
+            usage=usage,
+            ms=int((time.monotonic() - started) * 1000),
+            error=error,
         )
-    client = AsyncAnthropic(
-        api_key=settings.anthropic_api_key,
-        # An identity-linked key must name a workspace; harmless on a scoped key.
-        default_headers=(
-            {"anthropic-workspace-id": settings.anthropic_workspace_id} if settings.anthropic_workspace_id else {}
-        ),
-    )
-    run = run_id()
-    rows: list[Result] = []
 
-    logger.info(
-        "run %s: %d cases x %d attempts, model=%s tools=%s",
-        run,
-        len(cases),
-        runs,
-        settings.model,
-        use_tools,
-    )
+    def _result(self, case: Case, attempt: int, **outcome: Any) -> Result:
+        """One row: what this sweep is, plus what this case did."""
+        return Result(
+            run_id=self.run,
+            case_id=case.case_id,
+            capability=case.capability,
+            category=case.category,
+            model=self.settings.model,
+            tools_enabled=bool(self.tools),
+            attempt=attempt,
+            harness_version=harness_version(),
+            tool_server_sha=tool_server_sha(),
+            endpoint=self.settings.openbeta_endpoint,
+            max_crags=self.settings.openbeta_max_crags,
+            answer=outcome["answer"],
+            tool_calls=outcome["calls"],
+            turns=outcome["turns"],
+            stop_reason=outcome["stop_reason"],
+            usage=outcome["usage"],
+            ms=outcome["ms"],
+            error=outcome["error"],
+        )
 
-    async with mcp_session(env=settings.server_env()) as session:
-        tools = await tool_schemas(session) if use_tools else []
+    async def sweep(self, cases: list[Case], runs: int, out: Path) -> list[Result]:
+        """Run every case, appending a row per attempt.
+
+        Args:
+            runs: attempts per case. Repeats are the only way to measure variance,
+                since temperature was removed from the Messages API.
+            out: JSONL to append to; the source of truth, written before any export.
+        """
+        rows: list[Result] = []
+        logger.info(
+            "run %s: %d cases x %d attempts, model=%s tools=%s",
+            self.run,
+            len(cases),
+            runs,
+            self.settings.model,
+            bool(self.tools),
+        )
+
         for attempt in range(1, runs + 1):
             for case in cases:
-                row = await run_case(client, session if use_tools else None, case, tools, run, attempt)
+                row = await self.run_case(case, attempt)
                 jsonl.append(out, row.model_dump())
                 rows.append(row)
                 logger.info(
@@ -293,7 +329,32 @@ async def sweep(cases: list[Case], *, use_tools: bool, runs: int, out: Path) -> 
                     f", ERROR {row.error}" if row.error else "",
                 )
 
-    return rows
+        return rows
+
+
+def build_client() -> AsyncAnthropic:
+    """The Anthropic client, failing early if there are no credentials."""
+    settings = get_settings()
+    if not settings.anthropic_api_key:
+        raise RuntimeError(
+            "no ANTHROPIC_API_KEY in the environment or evals/.env -- every case in this sweep costs money, "
+            "so it fails here rather than partway through"
+        )
+    return AsyncAnthropic(
+        api_key=settings.anthropic_api_key,
+        # An identity-linked key must name a workspace; harmless on a scoped key.
+        default_headers=(
+            {"anthropic-workspace-id": settings.anthropic_workspace_id} if settings.anthropic_workspace_id else {}
+        ),
+    )
+
+
+async def sweep(cases: list[Case], *, use_tools: bool, runs: int, out: Path) -> list[Result]:
+    """Build a runner against the real server and run the set through it."""
+    async with mcp_session(env=get_settings().server_env()) as session:
+        tools = await tool_schemas(session) if use_tools else []
+        runner = AgentRunner(build_client(), session if use_tools else None, tools, run_id())
+        return await runner.sweep(cases, runs, out)
 
 
 def summarise(rows: list[Result]) -> None:

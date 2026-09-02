@@ -26,7 +26,7 @@ that alone.
 | `models.py` | The case schema. Import this, not `groundtruth`, if you only need `Case`. |
 | `payload.py` | Reading a tool response: what the expected value is, what fingerprints it. |
 | `groundtruth.py` | The generate/check CLI. |
-| `runner.py` | The agent loop. Records what happened; grades nothing. |
+| `runner.py` | `AgentRunner`: the agent loop. Records what happened; grades nothing. |
 | `export.py` | Result rows to MLflow, over the plumbing in `common/mlflow_export.py`. |
 | `data/` | The set itself — see [data/README.md](data/README.md). |
 

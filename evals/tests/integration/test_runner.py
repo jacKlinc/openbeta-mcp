@@ -25,7 +25,7 @@ from common.client import mcp_session
 from common.config import get_settings
 from judge.dataset import GoldenSet
 from judge.models import TOOL_ARGS
-from judge.runner import run_case, tool_schemas
+from judge.runner import AgentRunner, tool_schemas
 
 CASE_ID = "sport_first_lead_rumney"
 
@@ -83,7 +83,8 @@ async def run(model, case_id=CASE_ID, with_tools=True):
     case = next(c for c in GoldenSet().cases() if c.case_id == case_id)
     async with mcp_session(env=get_settings().server_env()) as session:
         tools = await tool_schemas(session) if with_tools else []
-        return await run_case(model, session if with_tools else None, case, tools, "test", 1)
+        runner = AgentRunner(model, session if with_tools else None, tools, "test")
+        return await runner.run_case(case, attempt=1)
 
 
 # --- tests ------------------------------------------------------------------
